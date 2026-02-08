@@ -6,8 +6,6 @@ import { Task } from "./Task";
 export enum UserRole {
     SUPER_ADMIN = "SuperAdmin",
     PROJECT_MANAGER = "ProjectManager",
-    MANAGER = "Manager",
-    TEAM_LEAD = "TeamLead",
     TEAM_MEMBER = "TeamMember"
 }
 

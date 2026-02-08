@@ -11,19 +11,8 @@ export class ProjectService {
         return await this.projectRepo.save(project);
     }
 
-    async getProjects(userId: string, role: string) {
-        let where = {};
-        if (role !== "SuperAdmin") {
-            where = [
-                { manager: { id: userId } },
-                { team: { members: { id: userId } } }
-            ];
-        }
-
-        return await this.projectRepo.find({
-            where,
-            relations: ["manager", "team", "boards", "boards.tasks"]
-        });
+    async getProjects() {
+        return await this.projectRepo.find({ relations: ["manager", "team"] });
     }
 
     async getProjectMetrics(projectId: string) {

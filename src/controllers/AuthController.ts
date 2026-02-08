@@ -6,11 +6,8 @@ const authService = new AuthService();
 export class AuthController {
     async register(req: Request, res: Response) {
         try {
-            const { token } = req.body;
-            const result = token
-                ? await authService.registerWithInvite(req.body)
-                : await authService.register(req.body);
-            res.status(201).json(result);
+            const user = await authService.registerWithInvite(req.body);
+            res.status(201).json(user);
         } catch (err: any) {
             res.status(400).json({ message: err.message });
         }

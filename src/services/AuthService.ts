@@ -10,25 +10,6 @@ export class AuthService {
     private sessionRepo = AppDataSource.getRepository(Session);
     private inviteRepo = AppDataSource.getRepository(Invitation);
 
-    async register(data: any) {
-        const { email, password, name } = data;
-
-        const existingUser = await this.userRepo.findOneBy({ email });
-        if (existingUser) throw new Error("User already exists");
-
-        const hashedPassword = await hashPassword(password);
-        const user = this.userRepo.create({
-            email,
-            name,
-            password: hashedPassword,
-            role: data.role || UserRole.TEAM_MEMBER
-        });
-
-        const savedUser = await this.userRepo.save(user);
-        const token = generateToken({ id: savedUser.id, role: savedUser.role });
-        return { token, user: { id: savedUser.id, name: savedUser.name, role: savedUser.role } };
-    }
-
     async registerWithInvite(data: any) {
         return await AppDataSource.transaction(async (manager) => {
             const { email, password, name, token } = data;

@@ -2,7 +2,6 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { User } from "./User";
 import { Team } from "./Team";
 import { Task } from "./Task";
-import { Board } from "./Board";
 
 @Entity("projects")
 export class Project {
@@ -23,9 +22,6 @@ export class Project {
 
     @OneToMany(() => Task, (task) => task.project)
     tasks!: Task[];
-
-    @OneToMany(() => Board, (board) => board.project)
-    boards!: Board[];
 
     @CreateDateColumn()
     createdAt!: Date;
