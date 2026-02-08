@@ -16,7 +16,7 @@ export class ProjectController {
 
     async getAll(req: AuthRequest, res: Response) {
         try {
-            const projects = await projectService.getProjects();
+            const projects = await projectService.getProjects(req.user!.id, req.user!.role);
             res.json(projects);
         } catch (err: any) {
             res.status(500).json({ message: err.message });

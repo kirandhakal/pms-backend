@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from "typeorm";
 import { Project } from "./Project";
+import { Board } from "./Board";
 import { User } from "./User";
 
 export enum TaskStatus {
@@ -31,6 +32,9 @@ export class Task {
 
     @ManyToOne(() => Project, (project) => project.tasks)
     project!: Project;
+
+    @ManyToOne(() => Board, (board) => board.tasks)
+    board!: Board;
 
     @ManyToOne(() => User, (user) => user.assignedTasks, { nullable: true })
     assignedUser?: User;
