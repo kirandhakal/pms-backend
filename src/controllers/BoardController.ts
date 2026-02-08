@@ -31,4 +31,13 @@ export class BoardController {
             res.status(400).json({ message: err.message });
         }
     }
+
+    async addMember(req: AuthRequest, res: Response) {
+        try {
+            const member = await boardService.addMember(req.params.id as string, req.body);
+            res.status(201).json(member);
+        } catch (err: any) {
+            res.status(400).json({ message: err.message });
+        }
+    }
 }

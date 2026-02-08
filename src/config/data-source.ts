@@ -7,6 +7,8 @@ import { Task } from "../entities/Task";
 import { Invitation } from "../entities/Invitation";
 import { Session } from "../entities/Session";
 import { Board } from "../entities/Board";
+import { BoardMember } from "../entities/BoardMember";
+import { Comment } from "../entities/Comment";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -16,7 +18,7 @@ export const AppDataSource = new DataSource({
     url: process.env.DATABASE_URL,
     synchronize: process.env.NODE_ENV === "development",
     logging: process.env.NODE_ENV === "development",
-    entities: [User, Team, Project, Task, Invitation, Session, Board],
+    entities: [User, Team, Project, Task, Invitation, Session, Board, BoardMember, Comment],
     migrations: [],
     subscribers: [],
 });

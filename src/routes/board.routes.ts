@@ -10,5 +10,6 @@ router.use(authenticate);
 router.post("/", boardController.create);
 router.get("/project/:projectId", boardController.getByProject);
 router.delete("/:id", boardController.delete);
+router.post("/:id/members", boardController.addMember);
 
 export default router;

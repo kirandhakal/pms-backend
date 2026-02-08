@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne } from "typeorm";
 import { UserRole } from "./User";
 import { Project } from "./Project";
+import { Team } from "./Team";
 
 @Entity("invitations")
 export class Invitation {
@@ -22,6 +23,9 @@ export class Invitation {
 
     @ManyToOne(() => Project, { nullable: true })
     project?: Project;
+
+    @ManyToOne(() => Team, { nullable: true })
+    team?: Team;
 
     @Column({ type: "timestamp" })
     expiresAt!: Date;

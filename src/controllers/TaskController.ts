@@ -44,4 +44,16 @@ export class TaskController {
             res.status(500).json({ message: err.message });
         }
     }
+
+    async addComment(req: AuthRequest, res: Response) {
+        try {
+            const { taskId } = req.params;
+            const { content } = req.body;
+            const userId = req.user!.id;
+            const comment = await taskService.addComment(taskId as string, userId, content);
+            res.status(201).json(comment);
+        } catch (err: any) {
+            res.status(400).json({ message: err.message });
+        }
+    }
 }

@@ -21,7 +21,7 @@ export class AuthService {
             email,
             name,
             password: hashedPassword,
-            role: UserRole.TEAM_MEMBER
+            role: data.role || UserRole.TEAM_MEMBER
         });
 
         const savedUser = await this.userRepo.save(user);

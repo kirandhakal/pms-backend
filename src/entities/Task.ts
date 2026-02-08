@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany } from "typeorm";
 import { Project } from "./Project";
 import { Board } from "./Board";
 import { User } from "./User";
+import { Comment } from "./Comment";
 
 export enum TaskStatus {
     TODO = "Todo",
@@ -41,6 +42,9 @@ export class Task {
 
     @Column({ type: "timestamp", nullable: true })
     completedAt?: Date;
+
+    @OneToMany(() => Comment, (comment) => comment.task)
+    comments!: Comment[];
 
     @CreateDateColumn()
     createdAt!: Date;

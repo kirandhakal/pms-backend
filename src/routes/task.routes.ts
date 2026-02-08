@@ -14,5 +14,6 @@ router.patch("/:taskId/status", taskController.updateStatus);
 // Progress tracking
 router.get("/progress/my", taskController.getMyProgress);
 router.get("/progress/:userId", authorize([UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER]), taskController.getIndividualProgress);
+router.post("/:taskId/comments", taskController.addComment);
 
 export default router;
