@@ -8,8 +8,8 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
-const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || "24h");
+const JWT_SECRET = process.env.JWT_SECRET || process.env.ACCESS_TOKEN_SECRET || "fallback_secret";
+const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || process.env.ACCESS_TOKEN_EXPIRES_IN || "24h");
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
 const hashPassword = async (password) => {
     return await bcryptjs_1.default.hash(password, BCRYPT_SALT_ROUNDS);

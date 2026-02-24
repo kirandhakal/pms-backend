@@ -6,7 +6,10 @@ import { Task } from "./Task";
 export enum UserRole {
     USER = "USER",
     ADMIN = "ADMIN",
-    SUPER_ADMIN = "SUPER_ADMIN"
+    SUPER_ADMIN = "SUPER_ADMIN",
+    TEAM_MEMBER = "TeamMember",
+    PROJECT_MANAGER = "ProjectManager",
+    TEAM_LEAD = "TeamLead"
 }
 
 @Entity("users")
@@ -14,7 +17,7 @@ export class User {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
-    @Column()
+    @Column({ name: "name" })
     fullName!: string;
 
     @Column({ unique: true })
