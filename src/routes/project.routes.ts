@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ProjectController } from "../controllers/ProjectController";
-import { authenticate, authorize } from "../middlewares/auth";
+import { authenticate, authorizeRoles } from "../middlewares/auth";
 import { UserRole } from "../entities/User";
 
 const router = Router();
@@ -8,10 +8,10 @@ const projectController = new ProjectController();
 
 router.use(authenticate);
 
-router.post("/", authorize([UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER]), projectController.create);
+router.post("/", authorizeRoles(UserRole.ADMIN, UserRole.SUPER_ADMIN), projectController.create);
 router.get("/", projectController.getAll);
 
 // Restricted Dashboard
-router.get("/dashboard", authorize([UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER]), projectController.getDashboard);
+router.get("/dashboard", authorizeRoles(UserRole.ADMIN, UserRole.SUPER_ADMIN), projectController.getDashboard);
 
 export default router;

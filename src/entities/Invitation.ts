@@ -16,7 +16,7 @@ export class Invitation {
     @Column({
         type: "enum",
         enum: UserRole,
-        default: UserRole.TEAM_MEMBER
+        default: UserRole.USER
     })
     role!: UserRole;
 

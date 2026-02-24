@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const UserController_1 = require("../controllers/UserController");
+const auth_1 = require("../middlewares/auth");
+const User_1 = require("../entities/User");
+const validate_1 = require("../middlewares/validate");
+const auth_schemas_1 = require("../validations/auth.schemas");
+const router = (0, express_1.Router)();
+const userController = new UserController_1.UserController();
+router.use(auth_1.authenticate);
+router.get("/", (0, auth_1.authorizeRoles)(User_1.UserRole.ADMIN, User_1.UserRole.SUPER_ADMIN), userController.getAllUsers);
+router.post("/admins", (0, auth_1.authorizeRoles)(User_1.UserRole.SUPER_ADMIN), (0, validate_1.validateBody)(auth_schemas_1.createAdminSchema), userController.createAdmin);
+exports.default = router;

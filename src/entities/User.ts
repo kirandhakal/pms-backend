@@ -4,9 +4,9 @@ import { Project } from "./Project";
 import { Task } from "./Task";
 
 export enum UserRole {
-    SUPER_ADMIN = "SuperAdmin",
-    PROJECT_MANAGER = "ProjectManager",
-    TEAM_MEMBER = "TeamMember"
+    USER = "USER",
+    ADMIN = "ADMIN",
+    SUPER_ADMIN = "SUPER_ADMIN"
 }
 
 @Entity("users")
@@ -15,7 +15,7 @@ export class User {
     id!: string;
 
     @Column()
-    name!: string;
+    fullName!: string;
 
     @Column({ unique: true })
     email!: string;
@@ -26,9 +26,12 @@ export class User {
     @Column({
         type: "enum",
         enum: UserRole,
-        default: UserRole.TEAM_MEMBER
+        default: UserRole.USER
     })
     role!: UserRole;
+
+    @Column({ default: true })
+    isActive!: boolean;
 
     @ManyToOne(() => Team, (team) => team.members, { nullable: true })
     team?: Team;
