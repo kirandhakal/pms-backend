@@ -35,15 +35,19 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         return res.status(401).json({ message: "Session inactive or logged out" });
     }
 
+    if (!session.user || !session.user.isActive || session.expiresAt <= new Date()) {
+        return res.status(401).json({ message: "Session expired or user inactive" });
+    }
+
     req.user = {
-        id: decoded.id,
-        role: decoded.role
+        id: session.user.id,
+        role: session.user.role
     };
 
     next();
 };
 
-export const authorize = (roles: UserRole[]) => {
+export const authorizeRoles = (...roles: UserRole[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
         if (!req.user || !roles.includes(req.user.role)) {
             return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
@@ -51,3 +55,5 @@ export const authorize = (roles: UserRole[]) => {
         next();
     };
 };
+
+export const authorize = (roles: UserRole[]) => authorizeRoles(...roles);
