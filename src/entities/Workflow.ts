@@ -59,7 +59,7 @@ export class Workflow {
     @Column({ nullable: true })
     createdById?: string;
 
-    @OneToMany(() => WorkflowStage, (stage) => stage.workflow, { cascade: true })
+    @OneToMany(() => WorkflowStage, (stage: WorkflowStage) => stage.workflow, { cascade: true })
     stages!: WorkflowStage[];
 
     @OneToMany(() => Task, (task) => task.workflow)

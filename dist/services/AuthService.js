@@ -20,7 +20,7 @@ class AuthService {
             fullName: data.fullName,
             email: data.email,
             password: await (0, auth_1.hashPassword)(data.password),
-            role: User_1.UserRole.USER,
+            legacyRole: User_1.UserRole.USER,
             isActive: true
         });
         const saved = await this.userRepo.save(user);
@@ -28,7 +28,7 @@ class AuthService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt
@@ -37,7 +37,7 @@ class AuthService {
     async login(email, password) {
         const user = await this.userRepo.findOne({
             where: { email },
-            select: ["id", "password", "role", "fullName", "email", "isActive"]
+            select: ["id", "password", "legacyRole", "fullName", "email", "isActive"]
         });
         if (!user || !(await (0, auth_1.comparePassword)(password, user.password))) {
             throw new errorHandler_1.ApiError("Invalid credentials", 401);
@@ -45,7 +45,7 @@ class AuthService {
         if (!user.isActive) {
             throw new errorHandler_1.ApiError("User account is inactive", 403);
         }
-        const token = (0, auth_1.generateToken)({ id: user.id, role: user.role });
+        const token = (0, auth_1.generateToken)({ id: user.id, legacyRole: user.legacyRole });
         const session = this.sessionRepo.create({
             user,
             token,
@@ -58,7 +58,7 @@ class AuthService {
                 id: user.id,
                 fullName: user.fullName,
                 email: user.email,
-                role: user.role,
+                legacyRole: user.legacyRole,
                 isActive: user.isActive
             }
         };
@@ -79,7 +79,7 @@ class AuthService {
             id: user.id,
             fullName: user.fullName,
             email: user.email,
-            role: user.role,
+            legacyRole: user.legacyRole,
             isActive: user.isActive,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt
@@ -105,7 +105,7 @@ class AuthService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt
@@ -143,7 +143,7 @@ class AuthService {
             fullName: data.fullName,
             email: data.email,
             password: await (0, auth_1.hashPassword)(data.password),
-            role: User_1.UserRole.ADMIN,
+            legacyRole: User_1.UserRole.ADMIN,
             isActive: true
         });
         const saved = await this.userRepo.save(user);
@@ -151,14 +151,14 @@ class AuthService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt
         };
     }
     async createSuperAdmin(data) {
-        const exists = await this.userRepo.findOne({ where: { role: User_1.UserRole.SUPER_ADMIN } });
+        const exists = await this.userRepo.findOne({ where: { legacyRole: User_1.UserRole.SUPER_ADMIN } });
         if (exists) {
             throw new errorHandler_1.ApiError("Super admin already exists", 409);
         }
@@ -170,7 +170,7 @@ class AuthService {
             fullName: data.fullName,
             email: data.email,
             password: await (0, auth_1.hashPassword)(data.password),
-            role: User_1.UserRole.SUPER_ADMIN,
+            legacyRole: User_1.UserRole.SUPER_ADMIN,
             isActive: true
         });
         const saved = await this.userRepo.save(user);
@@ -178,7 +178,7 @@ class AuthService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt

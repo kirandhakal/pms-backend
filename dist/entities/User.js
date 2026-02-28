@@ -11,14 +11,29 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = exports.UserRole = void 0;
 const typeorm_1 = require("typeorm");
-const Team_1 = require("./Team");
+const Organization_1 = require("./Organization");
+const Department_1 = require("./Department");
+const Role_1 = require("./Role");
 const Project_1 = require("./Project");
 const Task_1 = require("./Task");
+/**
+ * Legacy UserRole enum - kept for backwards compatibility
+ * New system uses Role entity with dynamic permissions
+ */
 var UserRole;
 (function (UserRole) {
     UserRole["USER"] = "USER";
     UserRole["ADMIN"] = "ADMIN";
     UserRole["SUPER_ADMIN"] = "SUPER_ADMIN";
+    UserRole["SUDO_ADMIN"] = "SUDO_ADMIN";
+    UserRole["DEPARTMENT_HEAD"] = "DEPARTMENT_HEAD";
+    UserRole["MANAGER"] = "MANAGER";
+    UserRole["MEMBER"] = "MEMBER";
+    UserRole["GUEST"] = "GUEST";
+    // Legacy roles
+    UserRole["TEAM_MEMBER"] = "TeamMember";
+    UserRole["PROJECT_MANAGER"] = "ProjectManager";
+    UserRole["TEAM_LEAD"] = "TeamLead";
 })(UserRole || (exports.UserRole = UserRole = {}));
 let User = class User {
 };
@@ -33,6 +48,7 @@ __decorate([
 ], User.prototype, "fullName", void 0);
 __decorate([
     (0, typeorm_1.Column)({ unique: true }),
+    (0, typeorm_1.Index)(),
     __metadata("design:type", String)
 ], User.prototype, "email", void 0);
 __decorate([
@@ -46,14 +62,56 @@ __decorate([
         default: UserRole.USER
     }),
     __metadata("design:type", String)
+], User.prototype, "legacyRole", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => Role_1.Role, (role) => role.users, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "roleId" }),
+    __metadata("design:type", Role_1.Role)
 ], User.prototype, "role", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    (0, typeorm_1.Index)(),
+    __metadata("design:type", String)
+], User.prototype, "roleId", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => Organization_1.Organization, (organization) => organization.users, { nullable: true, onDelete: "SET NULL" }),
+    (0, typeorm_1.JoinColumn)({ name: "organizationId" }),
+    __metadata("design:type", Organization_1.Organization)
+], User.prototype, "organization", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    (0, typeorm_1.Index)(),
+    __metadata("design:type", String)
+], User.prototype, "organizationId", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => Department_1.Department, (department) => department.members, { nullable: true, onDelete: "SET NULL" }),
+    (0, typeorm_1.JoinColumn)({ name: "departmentId" }),
+    __metadata("design:type", Department_1.Department)
+], User.prototype, "department", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    (0, typeorm_1.Index)(),
+    __metadata("design:type", String)
+], User.prototype, "departmentId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ default: true }),
     __metadata("design:type", Boolean)
 ], User.prototype, "isActive", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => Team_1.Team, (team) => team.members, { nullable: true }),
-    __metadata("design:type", Team_1.Team)
+    (0, typeorm_1.Column)({ type: "timestamp", nullable: true }),
+    __metadata("design:type", Date)
+], User.prototype, "lastLoginAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], User.prototype, "avatarUrl", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "jsonb", nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "preferences", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)("Team", "members", { nullable: true }),
+    __metadata("design:type", Object)
 ], User.prototype, "team", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => Project_1.Project, (project) => project.manager),

@@ -56,16 +56,16 @@ export class Organization {
     @Column({ nullable: true })
     ownerId?: string;
 
-    @OneToMany(() => Department, (department) => department.organization)
+    @OneToMany(() => Department, (department: Department) => department.organization)
     departments!: Department[];
 
     @OneToMany(() => User, (user) => user.organization)
     users!: User[];
 
-    @OneToMany(() => Workflow, (workflow) => workflow.organization)
+    @OneToMany(() => Workflow, (workflow: Workflow) => workflow.organization)
     workflows!: Workflow[];
 
-    @OneToMany(() => Role, (role) => role.organization)
+    @OneToMany(() => Role, (role: Role) => role.organization)
     roles!: Role[];
 
     @OneToMany(() => Invitation, (invitation) => invitation.organization)

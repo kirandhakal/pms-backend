@@ -42,7 +42,7 @@ export class Role {
     @Index()
     organizationId?: string;
 
-    @ManyToMany(() => Permission, (permission) => permission.roles)
+    @ManyToMany(() => Permission, (permission: Permission) => permission.roles)
     @JoinTable({
         name: "role_permissions",
         joinColumn: { name: "roleId", referencedColumnName: "id" },

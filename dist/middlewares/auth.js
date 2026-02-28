@@ -18,7 +18,7 @@ const authenticate = async (req, res, next) => {
     const sessionRepo = data_source_1.AppDataSource.getRepository(Session_1.Session);
     const session = await sessionRepo.findOne({
         where: { token, isActive: true },
-        relations: ["user"]
+        relations: ["user", "user.role", "user.role.permissions"]
     });
     if (!session) {
         return res.status(401).json({ message: "Session inactive or logged out" });
@@ -28,14 +28,17 @@ const authenticate = async (req, res, next) => {
     }
     req.user = {
         id: session.user.id,
-        role: session.user.role
+        role: session.user.role,
+        legacyRole: session.user.legacyRole,
+        organizationId: session.user.organizationId,
+        departmentId: session.user.departmentId
     };
     next();
 };
 exports.authenticate = authenticate;
 const authorizeRoles = (...roles) => {
     return (req, res, next) => {
-        if (!req.user || !roles.includes(req.user.role)) {
+        if (!req.user || !roles.includes(req.user.legacyRole)) {
             return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
         }
         next();

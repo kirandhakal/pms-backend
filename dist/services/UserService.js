@@ -24,7 +24,7 @@ class UserService {
             fullName: data.fullName,
             email: data.email,
             password: await (0, auth_1.hashPassword)(data.password),
-            role: User_1.UserRole.ADMIN,
+            legacyRole: User_1.UserRole.ADMIN,
             isActive: true
         });
         const saved = await this.userRepo.save(user);
@@ -32,7 +32,7 @@ class UserService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt
