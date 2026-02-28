@@ -6,11 +6,22 @@ import inviteRoutes from "./invite.routes";
 import userRoutes from "./user.routes";
 import dashboardRoutes from "./dashboard.routes";
 import publicRoutes from "./public.routes";
+import organizationRoutes from "./organization.routes";
+import workflowRoutes from "./workflow.routes";
+import roleRoutes from "./role.routes";
 
 const router = Router();
 
-router.use("/auth", authRoutes);
+// Public routes (no auth required)
 router.use("/public", publicRoutes);
+
+// Authentication routes
+router.use("/auth", authRoutes);
+
+// Protected routes
+router.use("/organizations", organizationRoutes);
+router.use("/workflows", workflowRoutes);
+router.use("/roles", roleRoutes);
 router.use("/projects", projectRoutes);
 router.use("/tasks", taskRoutes);
 router.use("/invites", inviteRoutes);

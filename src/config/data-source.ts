@@ -6,6 +6,15 @@ import { Project } from "../entities/Project";
 import { Task } from "../entities/Task";
 import { Invitation } from "../entities/Invitation";
 import { Session } from "../entities/Session";
+import { Organization } from "../entities/Organization";
+import { Department } from "../entities/Department";
+import { Role } from "../entities/Role";
+import { Permission } from "../entities/Permission";
+import { Workflow } from "../entities/Workflow";
+import { WorkflowStage } from "../entities/WorkflowStage";
+import { AuditLog } from "../entities/AuditLog";
+import { TaskActivity } from "../entities/TaskActivity";
+import { TaskComment } from "../entities/TaskComment";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -33,7 +42,23 @@ export const AppDataSource = new DataSource({
         }),
     synchronize: nodeEnv === "development",
     logging: nodeEnv === "development",
-    entities: [User, Team, Project, Task, Invitation, Session],
+    entities: [
+        User, 
+        Team, 
+        Project, 
+        Task, 
+        Invitation, 
+        Session,
+        Organization,
+        Department,
+        Role,
+        Permission,
+        Workflow,
+        WorkflowStage,
+        AuditLog,
+        TaskActivity,
+        TaskComment
+    ],
     migrations: [],
     subscribers: [],
 });

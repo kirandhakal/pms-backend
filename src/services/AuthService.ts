@@ -18,7 +18,7 @@ export class AuthService {
             fullName: data.fullName,
             email: data.email,
             password: await hashPassword(data.password),
-            role: UserRole.USER,
+            legacyRole: UserRole.USER,
             isActive: true
         });
 
@@ -27,7 +27,7 @@ export class AuthService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt
@@ -37,7 +37,7 @@ export class AuthService {
     async login(email: string, password: string) {
         const user = await this.userRepo.findOne({
             where: { email },
-            select: ["id", "password", "role", "fullName", "email", "isActive"]
+            select: ["id", "password", "legacyRole", "fullName", "email", "isActive"]
         });
 
         if (!user || !(await comparePassword(password, user.password))) {
@@ -48,7 +48,7 @@ export class AuthService {
             throw new ApiError("User account is inactive", 403);
         }
 
-        const token = generateToken({ id: user.id, role: user.role });
+        const token = generateToken({ id: user.id, legacyRole: user.legacyRole });
 
         const session = this.sessionRepo.create({
             user,
@@ -64,7 +64,7 @@ export class AuthService {
                 id: user.id,
                 fullName: user.fullName,
                 email: user.email,
-                role: user.role,
+                legacyRole: user.legacyRole,
                 isActive: user.isActive
             }
         };
@@ -88,7 +88,7 @@ export class AuthService {
             id: user.id,
             fullName: user.fullName,
             email: user.email,
-            role: user.role,
+            legacyRole: user.legacyRole,
             isActive: user.isActive,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt
@@ -118,7 +118,7 @@ export class AuthService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt
@@ -164,7 +164,7 @@ export class AuthService {
             fullName: data.fullName,
             email: data.email,
             password: await hashPassword(data.password),
-            role: UserRole.ADMIN,
+            legacyRole: UserRole.ADMIN,
             isActive: true
         });
 
@@ -174,7 +174,7 @@ export class AuthService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt
@@ -182,7 +182,7 @@ export class AuthService {
     }
 
     async createSuperAdmin(data: { fullName: string; email: string; password: string }) {
-        const exists = await this.userRepo.findOne({ where: { role: UserRole.SUPER_ADMIN } });
+        const exists = await this.userRepo.findOne({ where: { legacyRole: UserRole.SUPER_ADMIN } });
         if (exists) {
             throw new ApiError("Super admin already exists", 409);
         }
@@ -196,7 +196,7 @@ export class AuthService {
             fullName: data.fullName,
             email: data.email,
             password: await hashPassword(data.password),
-            role: UserRole.SUPER_ADMIN,
+            legacyRole: UserRole.SUPER_ADMIN,
             isActive: true
         });
 
@@ -206,7 +206,7 @@ export class AuthService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt

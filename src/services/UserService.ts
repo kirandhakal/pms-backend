@@ -23,7 +23,7 @@ export class UserService {
             fullName: data.fullName,
             email: data.email,
             password: await hashPassword(data.password),
-            role: UserRole.ADMIN,
+            legacyRole: UserRole.ADMIN,
             isActive: true
         });
 
@@ -33,7 +33,7 @@ export class UserService {
             id: saved.id,
             fullName: saved.fullName,
             email: saved.email,
-            role: saved.role,
+            legacyRole: saved.legacyRole,
             isActive: saved.isActive,
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt

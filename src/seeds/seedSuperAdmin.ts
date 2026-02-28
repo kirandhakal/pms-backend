@@ -1,7 +1,9 @@
 import "reflect-metadata";
 import { AppDataSource } from "../config/data-source";
 import { User, UserRole } from "../entities/User";
+import { Role } from "../entities/Role";
 import { hashPassword } from "../utils/auth";
+import { RoleLevel, SystemRoles } from "../config/permissions";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -29,24 +31,58 @@ async function seedSuperAdmin(): Promise<void> {
         }
 
         const userRepository = AppDataSource.getRepository(User);
+        const roleRepository = AppDataSource.getRepository(Role);
+
+        // Find or create SUDO_ADMIN role
+        let sudoAdminRole = await roleRepository.findOne({
+            where: { name: SystemRoles.SUDO_ADMIN, isSystem: true }
+        });
+
+        if (!sudoAdminRole) {
+            console.log("⚠️  SUDO_ADMIN role not found. Creating basic role...");
+            sudoAdminRole = roleRepository.create({
+                name: SystemRoles.SUDO_ADMIN,
+                description: "System-wide administrator with full access",
+                level: RoleLevel.SUDO_ADMIN,
+                isSystem: true,
+                isActive: true
+            });
+            await roleRepository.save(sudoAdminRole);
+            console.log("✅ Created SUDO_ADMIN role\n");
+        }
 
         // Check if super admin already exists
         const existingAdmin = await userRepository.findOne({
-            where: { email: DEFAULT_SUPER_ADMIN.email }
+            where: { email: DEFAULT_SUPER_ADMIN.email },
+            relations: ["role"]
         });
 
         if (existingAdmin) {
             console.log("ℹ️  Super Admin already exists:");
             console.log(`   Email: ${existingAdmin.email}`);
-            console.log(`   Role: ${existingAdmin.role}`);
+            console.log(`   Legacy Role: ${existingAdmin.legacyRole}`);
+            console.log(`   Role: ${existingAdmin.role?.name || "None"}`);
             console.log(`   Status: ${existingAdmin.isActive ? "Active" : "Inactive"}`);
             
-            // Update to SUPER_ADMIN role if not already
-            if (existingAdmin.role !== UserRole.SUPER_ADMIN) {
-                existingAdmin.role = UserRole.SUPER_ADMIN;
-                existingAdmin.isActive = true;
+            // Update to use new role system if not already
+            let needsUpdate = false;
+            
+            if (existingAdmin.legacyRole !== UserRole.SUDO_ADMIN) {
+                existingAdmin.legacyRole = UserRole.SUDO_ADMIN;
+                needsUpdate = true;
+            }
+            
+            if (!existingAdmin.roleId || existingAdmin.roleId !== sudoAdminRole.id) {
+                existingAdmin.roleId = sudoAdminRole.id;
+                existingAdmin.role = sudoAdminRole;
+                needsUpdate = true;
+            }
+            
+            existingAdmin.isActive = true;
+            
+            if (needsUpdate) {
                 await userRepository.save(existingAdmin);
-                console.log("\n✅ Updated existing user to SUPER_ADMIN role");
+                console.log("\n✅ Updated existing user with SUDO_ADMIN role");
             }
             
             console.log("\n🎉 Super Admin seeder completed!\n");
@@ -60,7 +96,8 @@ async function seedSuperAdmin(): Promise<void> {
             fullName: DEFAULT_SUPER_ADMIN.fullName,
             email: DEFAULT_SUPER_ADMIN.email,
             password: hashedPassword,
-            role: UserRole.SUPER_ADMIN,
+            legacyRole: UserRole.SUDO_ADMIN,
+            roleId: sudoAdminRole.id,
             isActive: true
         });
 
@@ -73,7 +110,7 @@ async function seedSuperAdmin(): Promise<void> {
         console.log(`   │  Name:     ${DEFAULT_SUPER_ADMIN.fullName.padEnd(27)}│`);
         console.log(`   │  Email:    ${DEFAULT_SUPER_ADMIN.email.padEnd(27)}│`);
         console.log(`   │  Password: ${DEFAULT_SUPER_ADMIN.password.padEnd(27)}│`);
-        console.log(`   │  Role:     ${UserRole.SUPER_ADMIN.padEnd(27)}│`);
+        console.log(`   │  Role:     ${SystemRoles.SUDO_ADMIN.padEnd(27)}│`);
         console.log("   └─────────────────────────────────────────┘");
         console.log("\n⚠️  Please change the password after first login!\n");
         console.log("🎉 Super Admin seeder completed!\n");
