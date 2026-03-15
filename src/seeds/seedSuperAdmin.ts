@@ -16,7 +16,7 @@ interface SuperAdminConfig {
 
 const DEFAULT_SUPER_ADMIN: SuperAdminConfig = {
     fullName: process.env.SUPER_ADMIN_NAME || "Super Admin",
-    email: process.env.SUPER_ADMIN_EMAIL || "admin@taskflow.com",
+    email: (process.env.SUPER_ADMIN_EMAIL || "admin@taskflow.com").trim().toLowerCase(),
     password: process.env.SUPER_ADMIN_PASSWORD || "SuperAdmin@123"
 };
 
@@ -79,10 +79,13 @@ async function seedSuperAdmin(): Promise<void> {
             }
             
             existingAdmin.isActive = true;
+            // Ensure known credentials work for existing admin as well.
+            existingAdmin.password = await hashPassword(DEFAULT_SUPER_ADMIN.password);
+            needsUpdate = true;
             
             if (needsUpdate) {
                 await userRepository.save(existingAdmin);
-                console.log("\n✅ Updated existing user with SUDO_ADMIN role");
+                console.log("\n✅ Updated existing user with SUDO_ADMIN role and refreshed password");
             }
             
             console.log("\n🎉 Super Admin seeder completed!\n");

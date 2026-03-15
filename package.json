@@ -10,7 +10,8 @@
     "seed:permissions": "ts-node src/seeds/seedPermissions.ts",
     "seed:roles": "ts-node src/seeds/seedDefaultRoles.ts",
     "seed:admin": "ts-node src/seeds/seedSuperAdmin.ts",
-    "seed:all": "npm run seed:permissions && npm run seed:roles && npm run seed:admin"
+    "seed:all": "npm run seed:permissions && npm run seed:roles && npm run seed:admin",
+    "typeorm": "typeorm"
   },
   "keywords": [],
   "author": "",

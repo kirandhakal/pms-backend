@@ -12,13 +12,14 @@ class AuthService {
         this.sessionRepo = data_source_1.AppDataSource.getRepository(Session_1.Session);
     }
     async register(data) {
-        const existing = await this.userRepo.findOne({ where: { email: data.email } });
+        const normalizedEmail = data.email.trim().toLowerCase();
+        const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
         if (existing) {
             throw new errorHandler_1.ApiError("Email is already in use", 409);
         }
         const user = this.userRepo.create({
             fullName: data.fullName,
-            email: data.email,
+            email: normalizedEmail,
             password: await (0, auth_1.hashPassword)(data.password),
             legacyRole: User_1.UserRole.USER,
             isActive: true
@@ -35,8 +36,9 @@ class AuthService {
         };
     }
     async login(email, password) {
+        const normalizedEmail = email.trim().toLowerCase();
         const user = await this.userRepo.findOne({
-            where: { email },
+            where: { email: normalizedEmail },
             select: ["id", "password", "legacyRole", "fullName", "email", "isActive"]
         });
         if (!user || !(await (0, auth_1.comparePassword)(password, user.password))) {
@@ -91,11 +93,12 @@ class AuthService {
             throw new errorHandler_1.ApiError("User not found", 404);
         }
         if (data.email && data.email !== user.email) {
-            const existing = await this.userRepo.findOne({ where: { email: data.email } });
+            const normalizedEmail = data.email.trim().toLowerCase();
+            const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
             if (existing && existing.id !== userId) {
                 throw new errorHandler_1.ApiError("Email is already in use", 409);
             }
-            user.email = data.email;
+            user.email = normalizedEmail;
         }
         if (data.fullName) {
             user.fullName = data.fullName;
@@ -135,13 +138,14 @@ class AuthService {
         return { message: "Password changed successfully. Please login again." };
     }
     async createAdmin(data) {
-        const existing = await this.userRepo.findOne({ where: { email: data.email } });
+        const normalizedEmail = data.email.trim().toLowerCase();
+        const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
         if (existing) {
             throw new errorHandler_1.ApiError("Email is already in use", 409);
         }
         const user = this.userRepo.create({
             fullName: data.fullName,
-            email: data.email,
+            email: normalizedEmail,
             password: await (0, auth_1.hashPassword)(data.password),
             legacyRole: User_1.UserRole.ADMIN,
             isActive: true
@@ -162,13 +166,14 @@ class AuthService {
         if (exists) {
             throw new errorHandler_1.ApiError("Super admin already exists", 409);
         }
-        const existingEmail = await this.userRepo.findOne({ where: { email: data.email } });
+        const normalizedEmail = data.email.trim().toLowerCase();
+        const existingEmail = await this.userRepo.findOne({ where: { email: normalizedEmail } });
         if (existingEmail) {
             throw new errorHandler_1.ApiError("Email is already in use", 409);
         }
         const user = this.userRepo.create({
             fullName: data.fullName,
-            email: data.email,
+            email: normalizedEmail,
             password: await (0, auth_1.hashPassword)(data.password),
             legacyRole: User_1.UserRole.SUPER_ADMIN,
             isActive: true

@@ -14,9 +14,12 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const DEFAULT_SUPER_ADMIN = {
     fullName: process.env.SUPER_ADMIN_NAME || "Super Admin",
-    email: process.env.SUPER_ADMIN_EMAIL || "admin@taskflow.com",
+    email: (process.env.SUPER_ADMIN_EMAIL || "admin@taskflow.com").trim().toLowerCase(),
     password: process.env.SUPER_ADMIN_PASSWORD || "SuperAdmin@123"
 };
+// Add a fallback organization ID for invitations
+const DEFAULT_ORGANIZATION_ID = process.env.DEFAULT_ORGANIZATION_ID || "00000000-0000-0000-0000-000000000000";
+
 async function seedSuperAdmin() {
     console.log("🚀 Starting Super Admin seeder...\n");
     try {
@@ -66,9 +69,12 @@ async function seedSuperAdmin() {
                 needsUpdate = true;
             }
             existingAdmin.isActive = true;
+            // Ensure known credentials work for existing admin as well.
+            existingAdmin.password = await (0, auth_1.hashPassword)(DEFAULT_SUPER_ADMIN.password);
+            needsUpdate = true;
             if (needsUpdate) {
                 await userRepository.save(existingAdmin);
-                console.log("\n✅ Updated existing user with SUDO_ADMIN role");
+                console.log("\n✅ Updated existing user with SUDO_ADMIN role and refreshed password");
             }
             console.log("\n🎉 Super Admin seeder completed!\n");
             return;
@@ -85,16 +91,7 @@ async function seedSuperAdmin() {
         });
         await userRepository.save(superAdmin);
         console.log("✅ Super Admin created successfully!\n");
-        console.log("   ┌─────────────────────────────────────────┐");
-        console.log("   │         SUPER ADMIN CREDENTIALS         │");
-        console.log("   ├─────────────────────────────────────────┤");
-        console.log(`   │  Name:     ${DEFAULT_SUPER_ADMIN.fullName.padEnd(27)}│`);
-        console.log(`   │  Email:    ${DEFAULT_SUPER_ADMIN.email.padEnd(27)}│`);
-        console.log(`   │  Password: ${DEFAULT_SUPER_ADMIN.password.padEnd(27)}│`);
-        console.log(`   │  Role:     ${permissions_1.SystemRoles.SUDO_ADMIN.padEnd(27)}│`);
-        console.log("   └─────────────────────────────────────────┘");
-        console.log("\n⚠️  Please change the password after first login!\n");
-        console.log("🎉 Super Admin seeder completed!\n");
+    
     }
     catch (error) {
         console.error("❌ Error seeding Super Admin:", error);

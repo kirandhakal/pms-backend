@@ -42,7 +42,7 @@ export class Invitation {
     @JoinColumn({ name: "organizationId" })
     organization!: Organization;
 
-    @Column()
+    @Column({ name: "organizationid" })
     @Index()
     organizationId!: string;
 
