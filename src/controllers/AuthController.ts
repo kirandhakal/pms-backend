@@ -3,6 +3,7 @@ import { AuthService } from "../services/AuthService";
 import { googleAuthenticate, googleAuthCallback, configureGoogleStrategy } from "../strategies/GoogleStrategy";
 import { githubAuthenticate, githubAuthCallback, configureGitHubStrategy } from "../strategies/GitHubStrategy";
 import passport from "passport";
+import { AuthRequest } from "../middlewares/auth";
 
 // Initialize OAuth strategies
 configureGoogleStrategy();
@@ -57,6 +58,21 @@ export class AuthController {
             res.json(result);
         } catch (err: any) {
             res.status(401).json({ message: err.message });
+        }
+    }
+
+    async me(req: AuthRequest, res: Response) {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+
+            const user = await authService.getCurrentUser(userId);
+            res.json(user);
+        } catch (err: any) {
+            res.status(404).json({ message: err.message });
         }
     }
 

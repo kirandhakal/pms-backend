@@ -109,6 +109,25 @@ export class AuthService {
         }
     }
 
+    async getCurrentUser(userId: string) {
+        const user = await this.userRepo.findOne({
+            where: { id: userId },
+            relations: ["team"]
+        });
+
+        if (!user) {
+            throw new Error("User not found");
+        }
+
+        return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            team: user.team ? { id: user.team.id, name: user.team.name } : null
+        };
+    }
+
     // SuperAdmin initial setup (Internal or via first user logic)
     async createSuperAdmin(data: any) {
         const hashedPassword = await hashPassword(data.password);

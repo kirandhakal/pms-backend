@@ -58,6 +58,20 @@ class AuthController {
             res.status(401).json({ message: err.message });
         }
     }
+    async me(req, res) {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const user = await authService.getCurrentUser(userId);
+            res.json(user);
+        }
+        catch (err) {
+            res.status(404).json({ message: err.message });
+        }
+    }
     async logout(req, res) {
         try {
             const authHeader = req.headers.authorization;
