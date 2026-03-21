@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const InviteController_1 = require("../controllers/InviteController");
+const auth_1 = require("../middlewares/auth");
+const User_1 = require("../entities/User");
+const router = (0, express_1.Router)();
+const inviteController = new InviteController_1.InviteController();
+router.post("/", auth_1.authenticate, (0, auth_1.authorize)([User_1.UserRole.SUPER_ADMIN, User_1.UserRole.PROJECT_MANAGER]), inviteController.invite);
+exports.default = router;

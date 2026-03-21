@@ -3,6 +3,7 @@ import authRoutes from "./auth.routes";
 import projectRoutes from "./project.routes";
 import taskRoutes from "./task.routes";
 import inviteRoutes from "./invite.routes";
+import organizationRoutes from "./organization.routes";
 
 const router = Router();
 
@@ -10,5 +11,6 @@ router.use("/auth", authRoutes);
 router.use("/projects", projectRoutes);
 router.use("/tasks", taskRoutes);
 router.use("/invites", inviteRoutes);
+router.use("/organizations", organizationRoutes);
 
 export default router;
