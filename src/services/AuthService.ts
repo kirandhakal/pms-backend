@@ -3,19 +3,47 @@ import { User, UserRole } from "../entities/User";
 import { Session } from "../entities/Session";
 import { Invitation } from "../entities/Invitation";
 import { hashPassword, comparePassword, generateToken } from "../utils/auth";
-import { LessThanOrEqual, MoreThan } from "typeorm";
+import { MoreThan } from "typeorm";
+import { ActivityAction } from "../entities/ActivityLog";
+import { ActivityLogService } from "./ActivityLogService";
 
 export class AuthService {
     private userRepo = AppDataSource.getRepository(User);
     private sessionRepo = AppDataSource.getRepository(Session);
     private inviteRepo = AppDataSource.getRepository(Invitation);
+    private activityLogService = new ActivityLogService();
+
+    async registerIndividual(data: { email: string; password: string; name: string }) {
+        const { email, password, name } = data;
+
+        const existing = await this.userRepo.findOne({ where: { email } });
+        if (existing) {
+            throw new Error("Email already registered");
+        }
+
+        const hashedPassword = await hashPassword(password);
+        const user = this.userRepo.create({
+            email,
+            name,
+            password: hashedPassword,
+            role: UserRole.TEAM_MEMBER
+        });
+
+        return this.userRepo.save(user);
+    }
 
     async registerWithInvite(data: any) {
         return await AppDataSource.transaction(async (manager) => {
             const { email, password, name, token } = data;
 
+            const existing = await manager.findOne(User, { where: { email } });
+            if (existing) {
+                throw new Error("Email already registered");
+            }
+
             const invitation = await manager.findOne(Invitation, {
-                where: { email, token, isUsed: false, expiresAt: MoreThan(new Date()) }
+                where: { email, token, isUsed: false, expiresAt: MoreThan(new Date()) },
+                relations: ["team"]
             });
 
             if (!invitation) {
@@ -27,13 +55,24 @@ export class AuthService {
                 email,
                 name,
                 password: hashedPassword,
-                role: invitation.role
+                role: invitation.role,
+                team: invitation.team
             });
 
             const savedUser = await manager.save(user);
 
             invitation.isUsed = true;
             await manager.save(invitation);
+
+            if (invitation.team?.id) {
+                await this.activityLogService.log({
+                    action: ActivityAction.MEMBER_JOINED,
+                    actorId: savedUser.id,
+                    targetUserId: savedUser.id,
+                    teamId: invitation.team.id,
+                    details: `${savedUser.email} joined via invite`
+                });
+            }
 
             return savedUser;
         });

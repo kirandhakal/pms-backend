@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from "typeorm";
 import { Project } from "./Project";
 import { User } from "./User";
+import { Team } from "./Team";
 
 export enum TaskStatus {
     TODO = "Todo",
@@ -29,8 +30,14 @@ export class Task {
     @Column({ type: "int", default: 0 })
     completionPercentage!: number;
 
-    @ManyToOne(() => Project, (project) => project.tasks)
-    project!: Project;
+    @ManyToOne(() => Project, (project) => project.tasks, { nullable: true })
+    project?: Project;
+
+    @ManyToOne(() => Team, { nullable: true })
+    team?: Team;
+
+    @ManyToOne(() => User, { nullable: true })
+    owner?: User;
 
     @ManyToOne(() => User, (user) => user.assignedTasks, { nullable: true })
     assignedUser?: User;

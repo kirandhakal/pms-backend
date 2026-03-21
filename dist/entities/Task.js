@@ -13,6 +13,7 @@ exports.Task = exports.TaskStatus = void 0;
 const typeorm_1 = require("typeorm");
 const Project_1 = require("./Project");
 const User_1 = require("./User");
+const Team_1 = require("./Team");
 var TaskStatus;
 (function (TaskStatus) {
     TaskStatus["TODO"] = "Todo";
@@ -47,9 +48,17 @@ __decorate([
     __metadata("design:type", Number)
 ], Task.prototype, "completionPercentage", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => Project_1.Project, (project) => project.tasks),
+    (0, typeorm_1.ManyToOne)(() => Project_1.Project, (project) => project.tasks, { nullable: true }),
     __metadata("design:type", Project_1.Project)
 ], Task.prototype, "project", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => Team_1.Team, { nullable: true }),
+    __metadata("design:type", Team_1.Team)
+], Task.prototype, "team", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => User_1.User, { nullable: true }),
+    __metadata("design:type", User_1.User)
+], Task.prototype, "owner", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => User_1.User, (user) => user.assignedTasks, { nullable: true }),
     __metadata("design:type", User_1.User)

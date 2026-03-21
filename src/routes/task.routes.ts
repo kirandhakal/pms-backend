@@ -8,11 +8,12 @@ const taskController = new TaskController();
 
 router.use(authenticate);
 
-router.post("/", authorize([UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER]), taskController.create);
+router.post("/", taskController.create);
 router.patch("/:taskId/status", taskController.updateStatus);
 
 // Progress tracking
 router.get("/progress/my", taskController.getMyProgress);
 router.get("/progress/:userId", authorize([UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER]), taskController.getIndividualProgress);
+router.get("/history/org/:teamId", taskController.getOrganizationTaskHistory);
 
 export default router;

@@ -20,9 +20,28 @@ passport_1.default.deserializeUser(async (id, done) => {
 });
 const authService = new AuthService_1.AuthService();
 class AuthController {
+    async signup(req, res) {
+        try {
+            const payload = {
+                ...req.body,
+                name: req.body.name ?? req.body.fullName
+            };
+            const user = await authService.registerIndividual(payload);
+            res.status(201).json(user);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
     async register(req, res) {
         try {
-            const user = await authService.registerWithInvite(req.body);
+            const payload = {
+                ...req.body,
+                name: req.body.name ?? req.body.fullName
+            };
+            const user = payload.token
+                ? await authService.registerWithInvite(payload)
+                : await authService.registerIndividual(payload);
             res.status(201).json(user);
         }
         catch (err) {

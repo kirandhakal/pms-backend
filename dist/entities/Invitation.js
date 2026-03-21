@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Invitation = void 0;
 const typeorm_1 = require("typeorm");
 const User_1 = require("./User");
-const Project_1 = require("./Project");
+const Team_1 = require("./Team");
 let Invitation = class Invitation {
 };
 exports.Invitation = Invitation;
@@ -37,9 +37,9 @@ __decorate([
     __metadata("design:type", String)
 ], Invitation.prototype, "role", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => Project_1.Project, { nullable: true }),
-    __metadata("design:type", Project_1.Project)
-], Invitation.prototype, "project", void 0);
+    (0, typeorm_1.ManyToOne)(() => Team_1.Team, { nullable: true }),
+    __metadata("design:type", Team_1.Team)
+], Invitation.prototype, "team", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "timestamp" }),
     __metadata("design:type", Date)

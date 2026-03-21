@@ -7,12 +7,14 @@ const Session_1 = require("../entities/Session");
 const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ message: "Unauthorized" });
+        res.status(401).json({ message: "Unauthorized" });
+        return;
     }
     const token = authHeader.split(" ")[1];
     const decoded = (0, auth_1.verifyToken)(token);
     if (!decoded) {
-        return res.status(401).json({ message: "Invalid or expired token" });
+        res.status(401).json({ message: "Invalid or expired token" });
+        return;
     }
     // Dual-layer: Session check
     const sessionRepo = data_source_1.AppDataSource.getRepository(Session_1.Session);
@@ -21,7 +23,8 @@ const authenticate = async (req, res, next) => {
         relations: ["user"]
     });
     if (!session) {
-        return res.status(401).json({ message: "Session inactive or logged out" });
+        res.status(401).json({ message: "Session inactive or logged out" });
+        return;
     }
     req.user = {
         id: decoded.id,
@@ -32,8 +35,9 @@ const authenticate = async (req, res, next) => {
 exports.authenticate = authenticate;
 const authorize = (roles) => {
     return (req, res, next) => {
-        if (!req.user || !roles.includes(req.user.role)) {
-            return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
+        if (!req.user?.role || !roles.includes(req.user.role)) {
+            res.status(403).json({ message: "Forbidden: Insufficient permissions" });
+            return;
         }
         next();
     };

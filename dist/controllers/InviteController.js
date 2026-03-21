@@ -6,8 +6,8 @@ const inviteService = new InviteService_1.InviteService();
 class InviteController {
     async invite(req, res) {
         try {
-            const { email, role, projectId } = req.body;
-            const result = await inviteService.createInvite(email, role, projectId);
+            const { email, role, teamId } = req.body;
+            const result = await inviteService.createInvite(email, role, teamId);
             res.json({ message: "Invite generated", ...result });
         }
         catch (err) {

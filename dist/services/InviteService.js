@@ -11,7 +11,7 @@ class InviteService {
     constructor() {
         this.inviteRepo = data_source_1.AppDataSource.getRepository(Invitation_1.Invitation);
     }
-    async createInvite(email, role, projectId) {
+    async createInvite(email, role, teamId) {
         const token = crypto_1.default.randomBytes(32).toString("hex");
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 48); // 48h limit
@@ -20,7 +20,7 @@ class InviteService {
             token,
             role,
             expiresAt,
-            project: projectId ? { id: projectId } : null
+            team: teamId ? { id: teamId } : undefined
         });
         await this.inviteRepo.save(invite);
         // In a real app, you'd send an email here.

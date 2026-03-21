@@ -1,42 +1,39 @@
-import { Request, Response } from "express";
-import { TaskService } from "../services/TaskService";
-import { AuthRequest } from "../middlewares/auth";
-import { TaskStatus } from "../entities/Task";
-
-const taskService = new TaskService();
-
-export class TaskController {
-    async create(req: AuthRequest, res: Response) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TaskController = void 0;
+const TaskService_1 = require("../services/TaskService");
+const taskService = new TaskService_1.TaskService();
+class TaskController {
+    async create(req, res) {
         try {
             const actorId = req.user?.id;
             if (!actorId) {
                 res.status(401).json({ message: "Unauthorized" });
                 return;
             }
-
             const task = await taskService.createTask({
                 ...req.body,
                 ownerId: req.body.ownerId ?? actorId,
                 actorId
             });
             res.status(201).json(task);
-        } catch (err: any) {
+        }
+        catch (err) {
             res.status(400).json({ message: err.message });
         }
     }
-
-    async updateStatus(req: AuthRequest, res: Response) {
+    async updateStatus(req, res) {
         try {
-            const taskId = req.params.taskId as string;
+            const taskId = req.params.taskId;
             const { status, completion } = req.body;
-            const task = await taskService.updateTaskStatus(taskId, status as TaskStatus, completion, req.user?.id);
+            const task = await taskService.updateTaskStatus(taskId, status, completion, req.user?.id);
             res.json(task);
-        } catch (err: any) {
+        }
+        catch (err) {
             res.status(400).json({ message: err.message });
         }
     }
-
-    async getMyProgress(req: AuthRequest, res: Response) {
+    async getMyProgress(req, res) {
         try {
             const userId = req.user?.id;
             if (!userId) {
@@ -45,28 +42,30 @@ export class TaskController {
             }
             const progress = await taskService.getUserProgress(userId);
             res.json(progress);
-        } catch (err: any) {
+        }
+        catch (err) {
             res.status(500).json({ message: err.message });
         }
     }
-
-    async getIndividualProgress(req: AuthRequest, res: Response) {
+    async getIndividualProgress(req, res) {
         try {
-            const userId = req.params.userId as string;
+            const userId = req.params.userId;
             const progress = await taskService.getUserProgress(userId);
             res.json(progress);
-        } catch (err: any) {
+        }
+        catch (err) {
             res.status(500).json({ message: err.message });
         }
     }
-
-    async getOrganizationTaskHistory(req: AuthRequest, res: Response) {
+    async getOrganizationTaskHistory(req, res) {
         try {
-            const teamId = req.params.teamId as string;
+            const teamId = req.params.teamId;
             const history = await taskService.getOrganizationTaskHistory(teamId);
             res.json(history);
-        } catch (err: any) {
+        }
+        catch (err) {
             res.status(500).json({ message: err.message });
         }
     }
 }
+exports.TaskController = TaskController;

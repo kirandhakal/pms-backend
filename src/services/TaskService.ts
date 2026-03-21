@@ -1,16 +1,57 @@
 import { AppDataSource } from "../config/data-source";
 import { Task, TaskStatus } from "../entities/Task";
+import { Project } from "../entities/Project";
+import { Team } from "../entities/Team";
+import { User } from "../entities/User";
+import { ActivityAction } from "../entities/ActivityLog";
+import { ActivityLogService } from "./ActivityLogService";
 
 export class TaskService {
     private taskRepo = AppDataSource.getRepository(Task);
+    private activityLogService = new ActivityLogService();
 
-    async createTask(data: any) {
-        const task = this.taskRepo.create(data);
-        return await this.taskRepo.save(task);
+    async createTask(data: {
+        name: string;
+        description?: string;
+        status?: TaskStatus;
+        completionPercentage?: number;
+        projectId?: string;
+        teamId?: string;
+        assignedUserId?: string;
+        ownerId?: string;
+        actorId?: string;
+    }) {
+        const task = this.taskRepo.create({
+            name: data.name,
+            description: data.description,
+            status: data.status,
+            completionPercentage: data.completionPercentage,
+            project: data.projectId ? ({ id: data.projectId } as Project) : undefined,
+            team: data.teamId ? ({ id: data.teamId } as Team) : undefined,
+            assignedUser: data.assignedUserId ? ({ id: data.assignedUserId } as User) : undefined,
+            owner: data.ownerId ? ({ id: data.ownerId } as User) : undefined
+        });
+
+        const savedTask = await this.taskRepo.save(task);
+
+        if (data.teamId) {
+            await this.activityLogService.log({
+                action: ActivityAction.TASK_CREATED,
+                actorId: data.actorId,
+                teamId: data.teamId,
+                taskId: savedTask.id,
+                details: `Task ${savedTask.name} created`
+            });
+        }
+
+        return savedTask;
     }
 
-    async updateTaskStatus(taskId: string, status: TaskStatus, completion?: number) {
-        const task = await this.taskRepo.findOneBy({ id: taskId });
+    async updateTaskStatus(taskId: string, status: TaskStatus, completion?: number, actorId?: string) {
+        const task = await this.taskRepo.findOne({
+            where: { id: taskId },
+            relations: ["team"]
+        });
         if (!task) throw new Error("Task not found");
 
         task.status = status;
@@ -20,7 +61,19 @@ export class TaskService {
             task.completionPercentage = 100;
         }
 
-        return await this.taskRepo.save(task);
+        const savedTask = await this.taskRepo.save(task);
+
+        if (savedTask.team?.id) {
+            await this.activityLogService.log({
+                action: ActivityAction.TASK_STATUS_UPDATED,
+                actorId,
+                teamId: savedTask.team.id,
+                taskId: savedTask.id,
+                details: `Task ${savedTask.name} moved to ${savedTask.status}`
+            });
+        }
+
+        return savedTask;
     }
 
     async getUserProgress(userId: string) {
@@ -41,5 +94,13 @@ export class TaskService {
                 updatedAt: t.updatedAt
             }))
         };
+    }
+
+    async getOrganizationTaskHistory(teamId: string) {
+        return this.taskRepo.find({
+            where: { team: { id: teamId } },
+            relations: ["assignedUser", "owner", "project"],
+            order: { updatedAt: "DESC" }
+        });
     }
 }
