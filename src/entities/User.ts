@@ -3,6 +3,12 @@ import { Team } from "./Team";
 import { Project } from "./Project";
 import { Task } from "./Task";
 
+export enum OAuthProvider {
+    GOOGLE = "google",
+    GITHUB = "github",
+    LOCAL = "local"
+}
+
 export enum UserRole {
     SUPER_ADMIN = "SuperAdmin",
     PROJECT_MANAGER = "ProjectManager",
@@ -20,8 +26,18 @@ export class User {
     @Column({ unique: true })
     email!: string;
 
-    @Column({ select: false })
+    @Column({ select: false, nullable: true })
     password!: string;
+
+    @Column({
+        type: "enum",
+        enum: OAuthProvider,
+        default: OAuthProvider.LOCAL
+    })
+    oauthProvider!: OAuthProvider;
+
+    @Column({ nullable: true })
+    oauthId!: string;
 
     @Column({
         type: "enum",
