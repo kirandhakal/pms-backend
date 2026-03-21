@@ -1,5 +1,21 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/AuthService";
+import { googleAuthenticate, googleAuthCallback, configureGoogleStrategy } from "../strategies/GoogleStrategy";
+import { githubAuthenticate, githubAuthCallback, configureGitHubStrategy } from "../strategies/GitHubStrategy";
+import passport from "passport";
+
+// Initialize OAuth strategies
+configureGoogleStrategy();
+configureGitHubStrategy();
+
+// Serialize/Deserialize for session (if needed)
+passport.serializeUser((user: any, done) => {
+    done(null, user.user.id);
+});
+
+passport.deserializeUser(async (id: string, done) => {
+    done(null, { id });
+});
 
 const authService = new AuthService();
 
@@ -43,6 +59,60 @@ export class AuthController {
             res.status(201).json(user);
         } catch (err: any) {
             res.status(400).json({ message: err.message });
+        }
+    }
+
+    // Google OAuth handlers
+    googleAuth(req: Request, res: Response) {
+        googleAuthenticate()(req, res, () => {});
+    }
+
+    async googleCallback(req: Request, res: Response) {
+        try {
+            const authFn = googleAuthCallback();
+            authFn(req, res, async (err: any) => {
+                if (err) {
+                    return res.status(401).json({ message: "Google authentication failed" });
+                }
+                
+                const user = (req as any).user;
+                if (!user || !user.token) {
+                    return res.status(401).json({ message: "Authentication failed" });
+                }
+
+                // Redirect to frontend with token
+                const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+                res.redirect(`${frontendUrl}/oauth-callback?token=${user.token}`);
+            });
+        } catch (err: any) {
+            res.status(500).json({ message: err.message });
+        }
+    }
+
+    // GitHub OAuth handlers
+    githubAuth(req: Request, res: Response) {
+        githubAuthenticate()(req, res, () => {});
+    }
+
+    async githubCallback(req: Request, res: Response) {
+        try {
+            const authFn = githubAuthCallback();
+            authFn(req, res, async (err: any) => {
+                if (err) {
+                    return res.status(401).json({ message: "GitHub authentication failed" });
+                }
+                
+                const user = (req as any).user;
+                if (!user || !user.token) {
+                    return res.status(401).json({ message: "Authentication failed" });
+                }
+
+                // Redirect to frontend with token
+                const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+                res.redirect(`${frontendUrl}/oauth-callback?token=${user.token}`);
+            });
+        } catch (err: any) {
+            res.status(500).json({ message: err.message });
         }
     }
 }
