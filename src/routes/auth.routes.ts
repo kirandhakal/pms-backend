@@ -10,6 +10,10 @@ router.post("/signup", authController.signup);
 router.post("/login", authController.login);
 router.post("/logout", authController.logout);
 router.get("/me", authenticate, authController.me);
+router.patch("/profile", authenticate, authController.updateProfile);
+router.patch("/change-password", authenticate, authController.changePassword);
+router.post("/forgot-password", authController.requestForgotPasswordOtp);
+router.post("/reset-password-otp", authController.resetPasswordWithOtp);
 router.post("/setup-admin", authController.setupSuperAdmin);
 
 // Google OAuth routes

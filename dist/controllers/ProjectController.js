@@ -6,7 +6,12 @@ const projectService = new ProjectService_1.ProjectService();
 class ProjectController {
     async create(req, res) {
         try {
-            const project = await projectService.createProject(req.body);
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const project = await projectService.createProject(actorId, req.body);
             res.status(201).json(project);
         }
         catch (err) {

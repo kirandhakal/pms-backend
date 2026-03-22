@@ -47,7 +47,7 @@ export const configureGoogleStrategy = () => {
                         email: profile.emails?.[0].value || "",
                         oauthProvider: OAuthProvider.GOOGLE,
                         oauthId: profile.id,
-                        role: UserRole.TEAM_MEMBER
+                        role: UserRole.MEMBER
                     });
 
                     user = await userRepo.save(user);

@@ -3,12 +3,13 @@ import { verifyToken } from "../utils/auth";
 import { AppDataSource } from "../config/data-source";
 import { Session } from "../entities/Session";
 import { UserRole } from "../entities/User";
+import { normalizeRole } from "../constants/access";
 
 declare global {
     namespace Express {
         interface User {
             id?: string;
-            role?: UserRole;
+            role?: string;
         }
     }
 }
@@ -54,7 +55,8 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
 export const authorize = (roles: UserRole[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
-        if (!req.user?.role || !roles.includes(req.user.role)) {
+        const normalizedRole = normalizeRole(req.user?.role);
+        if (!roles.includes(normalizedRole)) {
             res.status(403).json({ message: "Forbidden: Insufficient permissions" });
             return;
         }

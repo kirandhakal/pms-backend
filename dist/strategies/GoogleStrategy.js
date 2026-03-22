@@ -44,7 +44,7 @@ const configureGoogleStrategy = () => {
                 email: profile.emails?.[0].value || "",
                 oauthProvider: User_1.OAuthProvider.GOOGLE,
                 oauthId: profile.id,
-                role: User_1.UserRole.TEAM_MEMBER
+                role: User_1.UserRole.MEMBER
             });
             user = await userRepo.save(user);
             const token = (0, auth_1.generateToken)({ id: user.id, role: user.role });

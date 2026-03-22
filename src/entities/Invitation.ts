@@ -14,9 +14,8 @@ export class Invitation {
     token!: string;
 
     @Column({
-        type: "enum",
-        enum: UserRole,
-        default: UserRole.TEAM_MEMBER
+        type: "varchar",
+        default: UserRole.MEMBER
     })
     role!: UserRole;
 

@@ -111,8 +111,13 @@ class OrganizationController {
     }
     async members(req, res) {
         try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
             const teamId = String(req.params.teamId);
-            const members = await organizationService.getMembers(teamId);
+            const members = await organizationService.getMembers(actorId, teamId);
             res.json(members);
         }
         catch (err) {
@@ -121,13 +126,52 @@ class OrganizationController {
     }
     async activity(req, res) {
         try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
             const teamId = String(req.params.teamId);
             const limit = Number(req.query.limit ?? 50);
-            const result = await organizationService.getActivity(teamId, Number.isNaN(limit) ? 50 : limit);
+            const result = await organizationService.getActivity(actorId, teamId, Number.isNaN(limit) ? 50 : limit);
             res.json(result);
         }
         catch (err) {
             res.status(404).json({ message: err.message });
+        }
+    }
+    async getMemberPermissions(req, res) {
+        try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const teamId = String(req.params.teamId);
+            const memberId = String(req.params.memberId);
+            const result = await organizationService.getMemberPermissions(actorId, teamId, memberId);
+            res.json(result);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
+    async setMemberPermissions(req, res) {
+        try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const teamId = String(req.params.teamId);
+            const memberId = String(req.params.memberId);
+            const permissionValues = Array.isArray(req.body?.permissions) ? req.body.permissions : [];
+            const permissions = permissionValues;
+            const result = await organizationService.setMemberPermissions(actorId, teamId, memberId, permissions);
+            res.json(result);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
         }
     }
 }

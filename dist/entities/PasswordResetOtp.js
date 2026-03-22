@@ -9,48 +9,40 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Invitation = void 0;
+exports.PasswordResetOtp = void 0;
 const typeorm_1 = require("typeorm");
 const User_1 = require("./User");
-const Team_1 = require("./Team");
-let Invitation = class Invitation {
+let PasswordResetOtp = class PasswordResetOtp {
 };
-exports.Invitation = Invitation;
+exports.PasswordResetOtp = PasswordResetOtp;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
     __metadata("design:type", String)
-], Invitation.prototype, "id", void 0);
+], PasswordResetOtp.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.ManyToOne)(() => User_1.User, { nullable: false, onDelete: "CASCADE" }),
+    __metadata("design:type", User_1.User)
+], PasswordResetOtp.prototype, "user", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ select: false }),
     __metadata("design:type", String)
-], Invitation.prototype, "email", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ unique: true }),
-    __metadata("design:type", String)
-], Invitation.prototype, "token", void 0);
-__decorate([
-    (0, typeorm_1.Column)({
-        type: "varchar",
-        default: User_1.UserRole.MEMBER
-    }),
-    __metadata("design:type", String)
-], Invitation.prototype, "role", void 0);
-__decorate([
-    (0, typeorm_1.ManyToOne)(() => Team_1.Team, { nullable: true }),
-    __metadata("design:type", Team_1.Team)
-], Invitation.prototype, "team", void 0);
+], PasswordResetOtp.prototype, "otpHash", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "timestamp" }),
     __metadata("design:type", Date)
-], Invitation.prototype, "expiresAt", void 0);
+], PasswordResetOtp.prototype, "expiresAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ default: 0 }),
+    __metadata("design:type", Number)
+], PasswordResetOtp.prototype, "attempts", void 0);
 __decorate([
     (0, typeorm_1.Column)({ default: false }),
     __metadata("design:type", Boolean)
-], Invitation.prototype, "isUsed", void 0);
+], PasswordResetOtp.prototype, "used", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
-], Invitation.prototype, "createdAt", void 0);
-exports.Invitation = Invitation = __decorate([
-    (0, typeorm_1.Entity)("invitations")
-], Invitation);
+], PasswordResetOtp.prototype, "createdAt", void 0);
+exports.PasswordResetOtp = PasswordResetOtp = __decorate([
+    (0, typeorm_1.Entity)("password_reset_otps")
+], PasswordResetOtp);

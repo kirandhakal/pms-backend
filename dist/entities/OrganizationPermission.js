@@ -9,46 +9,42 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Team = void 0;
+exports.OrganizationPermission = void 0;
 const typeorm_1 = require("typeorm");
+const Team_1 = require("./Team");
 const User_1 = require("./User");
-const Project_1 = require("./Project");
-const OrganizationPermission_1 = require("./OrganizationPermission");
-let Team = class Team {
+const access_1 = require("../constants/access");
+let OrganizationPermission = class OrganizationPermission {
 };
-exports.Team = Team;
+exports.OrganizationPermission = OrganizationPermission;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
     __metadata("design:type", String)
-], Team.prototype, "id", void 0);
+], OrganizationPermission.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
-    __metadata("design:type", String)
-], Team.prototype, "name", void 0);
+    (0, typeorm_1.ManyToOne)(() => Team_1.Team, { nullable: false, onDelete: "CASCADE" }),
+    __metadata("design:type", Team_1.Team)
+], OrganizationPermission.prototype, "team", void 0);
 __decorate([
-    (0, typeorm_1.OneToMany)(() => User_1.User, (user) => user.team),
-    __metadata("design:type", Array)
-], Team.prototype, "members", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => Project_1.Project, (project) => project.team),
-    __metadata("design:type", Array)
-], Team.prototype, "projects", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => OrganizationPermission_1.OrganizationPermission, (permission) => permission.team),
-    __metadata("design:type", Array)
-], Team.prototype, "permissions", void 0);
+    (0, typeorm_1.ManyToOne)(() => User_1.User, { nullable: false, onDelete: "CASCADE" }),
+    __metadata("design:type", User_1.User)
+], OrganizationPermission.prototype, "user", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => User_1.User, { nullable: true, onDelete: "SET NULL" }),
     __metadata("design:type", User_1.User)
-], Team.prototype, "createdBy", void 0);
+], OrganizationPermission.prototype, "grantedBy", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: "enum",
+        enum: access_1.PermissionKey
+    }),
+    __metadata("design:type", String)
+], OrganizationPermission.prototype, "permission", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
-], Team.prototype, "createdAt", void 0);
-__decorate([
-    (0, typeorm_1.UpdateDateColumn)(),
-    __metadata("design:type", Date)
-], Team.prototype, "updatedAt", void 0);
-exports.Team = Team = __decorate([
-    (0, typeorm_1.Entity)("teams")
-], Team);
+], OrganizationPermission.prototype, "createdAt", void 0);
+exports.OrganizationPermission = OrganizationPermission = __decorate([
+    (0, typeorm_1.Entity)("organization_permissions"),
+    (0, typeorm_1.Unique)(["team", "user", "permission"])
+], OrganizationPermission);

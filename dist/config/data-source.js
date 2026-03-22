@@ -13,6 +13,8 @@ const Task_1 = require("../entities/Task");
 const Invitation_1 = require("../entities/Invitation");
 const Session_1 = require("../entities/Session");
 const ActivityLog_1 = require("../entities/ActivityLog");
+const OrganizationPermission_1 = require("../entities/OrganizationPermission");
+const PasswordResetOtp_1 = require("../entities/PasswordResetOtp");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 exports.AppDataSource = new typeorm_1.DataSource({
@@ -20,7 +22,7 @@ exports.AppDataSource = new typeorm_1.DataSource({
     url: process.env.DATABASE_URL,
     synchronize: process.env.NODE_ENV === "development",
     logging: process.env.NODE_ENV === "development",
-    entities: [User_1.User, Team_1.Team, Project_1.Project, Task_1.Task, Invitation_1.Invitation, Session_1.Session, ActivityLog_1.ActivityLog],
+    entities: [User_1.User, Team_1.Team, Project_1.Project, Task_1.Task, Invitation_1.Invitation, Session_1.Session, ActivityLog_1.ActivityLog, OrganizationPermission_1.OrganizationPermission, PasswordResetOtp_1.PasswordResetOtp],
     migrations: [],
     subscribers: [],
 });

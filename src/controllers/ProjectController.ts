@@ -7,7 +7,13 @@ const projectService = new ProjectService();
 export class ProjectController {
     async create(req: AuthRequest, res: Response) {
         try {
-            const project = await projectService.createProject(req.body);
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+
+            const project = await projectService.createProject(actorId, req.body);
             res.status(201).json(project);
         } catch (err: any) {
             res.status(400).json({ message: err.message });

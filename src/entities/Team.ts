@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne } from "typeorm";
 import { User } from "./User";
 import { Project } from "./Project";
+import { OrganizationPermission } from "./OrganizationPermission";
 
 @Entity("teams")
 export class Team {
@@ -15,6 +16,12 @@ export class Team {
 
     @OneToMany(() => Project, (project) => project.team)
     projects!: Project[];
+
+    @OneToMany(() => OrganizationPermission, (permission) => permission.team)
+    permissions!: OrganizationPermission[];
+
+    @ManyToOne(() => User, { nullable: true, onDelete: "SET NULL" })
+    createdBy?: User;
 
     @CreateDateColumn()
     createdAt!: Date;

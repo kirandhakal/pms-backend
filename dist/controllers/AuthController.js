@@ -85,6 +85,55 @@ class AuthController {
             res.status(500).json({ message: err.message });
         }
     }
+    async updateProfile(req, res) {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const updated = await authService.updateProfile(userId, req.body);
+            res.json(updated);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
+    async changePassword(req, res) {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const { currentPassword, newPassword } = req.body;
+            const result = await authService.changePassword(userId, currentPassword, newPassword);
+            res.json(result);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
+    async requestForgotPasswordOtp(req, res) {
+        try {
+            const { email } = req.body;
+            const result = await authService.requestForgotPasswordOtp(email);
+            res.json(result);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
+    async resetPasswordWithOtp(req, res) {
+        try {
+            const { email, otp, newPassword } = req.body;
+            const result = await authService.resetPasswordWithOtp(email, otp, newPassword);
+            res.json(result);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
     async setupSuperAdmin(req, res) {
         try {
             // This should be protected or only allowed once

@@ -8,10 +8,10 @@ const projectController = new ProjectController();
 
 router.use(authenticate);
 
-router.post("/", authorize([UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER]), projectController.create);
+router.post("/", projectController.create);
 router.get("/", projectController.getAll);
 
 // Restricted Dashboard
-router.get("/dashboard", authorize([UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER]), projectController.getDashboard);
+router.get("/dashboard", authorize([UserRole.SUDO_ADMIN, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]), projectController.getDashboard);
 
 export default router;

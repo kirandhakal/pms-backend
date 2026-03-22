@@ -7,6 +7,8 @@ import { Task } from "../entities/Task";
 import { Invitation } from "../entities/Invitation";
 import { Session } from "../entities/Session";
 import { ActivityLog } from "../entities/ActivityLog";
+import { OrganizationPermission } from "../entities/OrganizationPermission";
+import { PasswordResetOtp } from "../entities/PasswordResetOtp";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -16,7 +18,7 @@ export const AppDataSource = new DataSource({
     url: process.env.DATABASE_URL,
     synchronize: process.env.NODE_ENV === "development",
     logging: process.env.NODE_ENV === "development",
-    entities: [User, Team, Project, Task, Invitation, Session, ActivityLog],
+    entities: [User, Team, Project, Task, Invitation, Session, ActivityLog, OrganizationPermission, PasswordResetOtp],
     migrations: [],
     subscribers: [],
 });

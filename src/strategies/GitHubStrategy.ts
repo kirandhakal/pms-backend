@@ -51,7 +51,7 @@ export const configureGitHubStrategy = () => {
                         email: email || `${profile.id}@github.local`,
                         oauthProvider: OAuthProvider.GITHUB,
                         oauthId: profile.id,
-                        role: UserRole.TEAM_MEMBER
+                        role: UserRole.MEMBER
                     });
 
                     user = await userRepo.save(user);
