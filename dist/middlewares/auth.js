@@ -4,6 +4,7 @@ exports.authorize = exports.authenticate = void 0;
 const auth_1 = require("../utils/auth");
 const data_source_1 = require("../config/data-source");
 const Session_1 = require("../entities/Session");
+const access_1 = require("../constants/access");
 const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -35,7 +36,8 @@ const authenticate = async (req, res, next) => {
 exports.authenticate = authenticate;
 const authorize = (roles) => {
     return (req, res, next) => {
-        if (!req.user?.role || !roles.includes(req.user.role)) {
+        const normalizedRole = (0, access_1.normalizeRole)(req.user?.role);
+        if (!roles.includes(normalizedRole)) {
             res.status(403).json({ message: "Forbidden: Insufficient permissions" });
             return;
         }

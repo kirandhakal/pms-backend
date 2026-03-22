@@ -1,13 +1,51 @@
 import { AppDataSource } from "../config/data-source";
 import { Project } from "../entities/Project";
 import { Task, TaskStatus } from "../entities/Task";
+import { User } from "../entities/User";
+import { PermissionService } from "./PermissionService";
+import { PermissionKey } from "../constants/access";
+import { Team } from "../entities/Team";
 
 export class ProjectService {
     private projectRepo = AppDataSource.getRepository(Project);
     private taskRepo = AppDataSource.getRepository(Task);
+    private userRepo = AppDataSource.getRepository(User);
+    private teamRepo = AppDataSource.getRepository(Team);
+    private permissionService = new PermissionService();
 
-    async createProject(data: any) {
-        const project = this.projectRepo.create(data);
+    async createProject(actorId: string, data: any) {
+        const actor = await this.userRepo.findOne({
+            where: { id: actorId },
+            relations: ["team", "team.createdBy"]
+        });
+
+        if (!actor || !actor.team?.id) {
+            throw new Error("Only organization members can create projects");
+        }
+
+        const canCreateProject = await this.permissionService.userHasPermission(actor, PermissionKey.PROJECT_CREATE);
+        if (!canCreateProject) {
+            throw new Error("You do not have permission to create projects");
+        }
+
+        if (data.team?.id && data.team.id !== actor.team.id) {
+            throw new Error("You can only create projects in your organization");
+        }
+
+        if (data.teamId && data.teamId !== actor.team.id) {
+            throw new Error("You can only create projects in your organization");
+        }
+
+        const team = await this.teamRepo.findOne({ where: { id: actor.team.id } });
+        if (!team) {
+            throw new Error("Organization not found");
+        }
+
+        const project = this.projectRepo.create({
+            ...data,
+            team
+        });
+
         return await this.projectRepo.save(project);
     }
 

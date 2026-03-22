@@ -11,6 +11,6 @@ router.post("/", taskController.create);
 router.patch("/:taskId/status", taskController.updateStatus);
 // Progress tracking
 router.get("/progress/my", taskController.getMyProgress);
-router.get("/progress/:userId", (0, auth_1.authorize)([User_1.UserRole.SUPER_ADMIN, User_1.UserRole.PROJECT_MANAGER]), taskController.getIndividualProgress);
+router.get("/progress/:userId", (0, auth_1.authorize)([User_1.UserRole.SUDO_ADMIN, User_1.UserRole.SUPER_ADMIN, User_1.UserRole.ADMIN, User_1.UserRole.MANAGER]), taskController.getIndividualProgress);
 router.get("/history/org/:teamId", taskController.getOrganizationTaskHistory);
 exports.default = router;

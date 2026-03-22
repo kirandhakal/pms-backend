@@ -13,7 +13,7 @@ router.patch("/:taskId/status", taskController.updateStatus);
 
 // Progress tracking
 router.get("/progress/my", taskController.getMyProgress);
-router.get("/progress/:userId", authorize([UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER]), taskController.getIndividualProgress);
+router.get("/progress/:userId", authorize([UserRole.SUDO_ADMIN, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]), taskController.getIndividualProgress);
 router.get("/history/org/:teamId", taskController.getOrganizationTaskHistory);
 
 export default router;

@@ -13,6 +13,8 @@ router.get("/:teamId/members", organizationController.members);
 router.post("/:teamId/invite", organizationController.invite);
 router.post("/:teamId/members", organizationController.addMember);
 router.patch("/:teamId/members/:memberId/role", organizationController.updateMemberRole);
+router.get("/:teamId/members/:memberId/permissions", organizationController.getMemberPermissions);
+router.put("/:teamId/members/:memberId/permissions", organizationController.setMemberPermissions);
 router.delete("/:teamId/members/:memberId", organizationController.removeMember);
 router.get("/:teamId/activity", organizationController.activity);
 exports.default = router;

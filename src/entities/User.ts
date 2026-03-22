@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Team } from "./Team";
 import { Project } from "./Project";
 import { Task } from "./Task";
+import { OrganizationPermission } from "./OrganizationPermission";
 
 export enum OAuthProvider {
     GOOGLE = "google",
@@ -10,9 +11,13 @@ export enum OAuthProvider {
 }
 
 export enum UserRole {
-    SUPER_ADMIN = "SuperAdmin",
-    PROJECT_MANAGER = "ProjectManager",
-    TEAM_MEMBER = "TeamMember"
+    SUDO_ADMIN = "SUDO_ADMIN",
+    SUPER_ADMIN = "SUPER_ADMIN",
+    ADMIN = "ADMIN",
+    DEPARTMENT_HEAD = "DEPARTMENT_HEAD",
+    MANAGER = "MANAGER",
+    MEMBER = "MEMBER",
+    GUEST = "GUEST"
 }
 
 @Entity("users")
@@ -40,11 +45,16 @@ export class User {
     oauthId!: string;
 
     @Column({
-        type: "enum",
-        enum: UserRole,
-        default: UserRole.TEAM_MEMBER
+        type: "varchar",
+        default: UserRole.MEMBER
     })
     role!: UserRole;
+
+    @Column({ nullable: true })
+    avatarUrl?: string;
+
+    @Column({ nullable: true })
+    phone?: string;
 
     @ManyToOne(() => Team, (team) => team.members, { nullable: true })
     team?: Team;
@@ -54,6 +64,9 @@ export class User {
 
     @OneToMany(() => Task, (task) => task.assignedUser)
     assignedTasks?: Task[];
+
+    @OneToMany(() => OrganizationPermission, (permission) => permission.user)
+    organizationPermissions?: OrganizationPermission[];
 
     @CreateDateColumn()
     createdAt!: Date;

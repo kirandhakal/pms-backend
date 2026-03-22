@@ -6,6 +6,6 @@ import { UserRole } from "../entities/User";
 const router = Router();
 const inviteController = new InviteController();
 
-router.post("/", authenticate, authorize([UserRole.SUPER_ADMIN, UserRole.PROJECT_MANAGER]), inviteController.invite);
+router.post("/", authenticate, authorize([UserRole.SUDO_ADMIN, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]), inviteController.invite);
 
 export default router;
