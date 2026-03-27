@@ -9,6 +9,7 @@ import { ActivityLogService } from "./ActivityLogService";
 import { normalizeRole } from "../constants/access";
 import { PermissionService } from "./PermissionService";
 import { PasswordResetOtp } from "../entities/PasswordResetOtp";
+import { EmailService } from "./EmailService";
 
 export class AuthService {
     private userRepo = AppDataSource.getRepository(User);
@@ -17,6 +18,7 @@ export class AuthService {
     private otpRepo = AppDataSource.getRepository(PasswordResetOtp);
     private activityLogService = new ActivityLogService();
     private permissionService = new PermissionService();
+    private emailService = new EmailService();
 
     async registerIndividual(data: { email: string; password: string; name: string }) {
         const { email, password, name } = data;
@@ -251,7 +253,8 @@ export class AuthService {
 
         await this.otpRepo.save(record);
 
-        // Placeholder for email provider integration.
+        await this.emailService.sendOtp({ email: user.email, otp });
+
         return {
             message: "If this email exists, an OTP has been sent.",
             ...(process.env.NODE_ENV === "development" ? { devOtp: otp } : {})

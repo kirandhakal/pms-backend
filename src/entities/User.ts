@@ -3,6 +3,7 @@ import { Team } from "./Team";
 import { Project } from "./Project";
 import { Task } from "./Task";
 import { OrganizationPermission } from "./OrganizationPermission";
+import { ProjectPermission } from "./ProjectPermission";
 
 export enum OAuthProvider {
     GOOGLE = "google",
@@ -67,6 +68,9 @@ export class User {
 
     @OneToMany(() => OrganizationPermission, (permission) => permission.user)
     organizationPermissions?: OrganizationPermission[];
+
+    @OneToMany(() => ProjectPermission, (permission) => permission.user)
+    projectPermissions?: ProjectPermission[];
 
     @CreateDateColumn()
     createdAt!: Date;

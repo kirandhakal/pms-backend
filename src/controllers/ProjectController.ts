@@ -22,10 +22,16 @@ export class ProjectController {
 
     async getAll(req: AuthRequest, res: Response) {
         try {
-            const projects = await projectService.getProjects();
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+
+            const projects = await projectService.getProjects(actorId);
             res.json(projects);
         } catch (err: any) {
-            res.status(500).json({ message: err.message });
+            res.status(400).json({ message: err.message });
         }
     }
 
