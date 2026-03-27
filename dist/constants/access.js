@@ -3,7 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_ROLE_PERMISSIONS = exports.CREATOR_CONTROLLED_PERMISSIONS = exports.ROLE_LEVEL = exports.PermissionKey = void 0;
 exports.normalizeRole = normalizeRole;
 exports.hasMinimumRole = hasMinimumRole;
-const User_1 = require("../entities/User");
+const ROLE = {
+    SUDO_ADMIN: "SUDO_ADMIN",
+    SUPER_ADMIN: "SUPER_ADMIN",
+    ADMIN: "ADMIN",
+    DEPARTMENT_HEAD: "DEPARTMENT_HEAD",
+    MANAGER: "MANAGER",
+    MEMBER: "MEMBER",
+    GUEST: "GUEST"
+};
 var PermissionKey;
 (function (PermissionKey) {
     PermissionKey["PROJECT_CREATE"] = "PROJECT_CREATE";
@@ -16,18 +24,18 @@ var PermissionKey;
     PermissionKey["ROLE_ASSIGN"] = "ROLE_ASSIGN";
 })(PermissionKey || (exports.PermissionKey = PermissionKey = {}));
 const LEGACY_ROLE_ALIAS = {
-    SuperAdmin: User_1.UserRole.SUPER_ADMIN,
-    ProjectManager: User_1.UserRole.MANAGER,
-    TeamMember: User_1.UserRole.MEMBER
+    SuperAdmin: ROLE.SUPER_ADMIN,
+    ProjectManager: ROLE.MANAGER,
+    TeamMember: ROLE.MEMBER
 };
 exports.ROLE_LEVEL = {
-    [User_1.UserRole.SUDO_ADMIN]: 0,
-    [User_1.UserRole.SUPER_ADMIN]: 1,
-    [User_1.UserRole.ADMIN]: 2,
-    [User_1.UserRole.DEPARTMENT_HEAD]: 3,
-    [User_1.UserRole.MANAGER]: 4,
-    [User_1.UserRole.MEMBER]: 5,
-    [User_1.UserRole.GUEST]: 6
+    [ROLE.SUDO_ADMIN]: 0,
+    [ROLE.SUPER_ADMIN]: 1,
+    [ROLE.ADMIN]: 2,
+    [ROLE.DEPARTMENT_HEAD]: 3,
+    [ROLE.MANAGER]: 4,
+    [ROLE.MEMBER]: 5,
+    [ROLE.GUEST]: 6
 };
 exports.CREATOR_CONTROLLED_PERMISSIONS = new Set([
     PermissionKey.PROJECT_CREATE,
@@ -37,7 +45,7 @@ exports.CREATOR_CONTROLLED_PERMISSIONS = new Set([
     PermissionKey.ROLE_ASSIGN
 ]);
 exports.DEFAULT_ROLE_PERMISSIONS = {
-    [User_1.UserRole.SUDO_ADMIN]: [
+    [ROLE.SUDO_ADMIN]: [
         PermissionKey.PROJECT_CREATE,
         PermissionKey.VIEW_TEAM_ACTIVITY,
         PermissionKey.VIEW_TEAM_ANALYTICS,
@@ -47,7 +55,7 @@ exports.DEFAULT_ROLE_PERMISSIONS = {
         PermissionKey.MEMBER_MANAGE,
         PermissionKey.ROLE_ASSIGN
     ],
-    [User_1.UserRole.SUPER_ADMIN]: [
+    [ROLE.SUPER_ADMIN]: [
         PermissionKey.PROJECT_CREATE,
         PermissionKey.VIEW_TEAM_ACTIVITY,
         PermissionKey.VIEW_TEAM_ANALYTICS,
@@ -57,38 +65,38 @@ exports.DEFAULT_ROLE_PERMISSIONS = {
         PermissionKey.MEMBER_MANAGE,
         PermissionKey.ROLE_ASSIGN
     ],
-    [User_1.UserRole.ADMIN]: [
+    [ROLE.ADMIN]: [
         PermissionKey.BROADCAST_SEND,
         PermissionKey.BROADCAST_VIEW,
         PermissionKey.MEMBER_MANAGE,
         PermissionKey.VIEW_TEAM_ACTIVITY,
         PermissionKey.VIEW_TEAM_PROGRESS
     ],
-    [User_1.UserRole.DEPARTMENT_HEAD]: [
+    [ROLE.DEPARTMENT_HEAD]: [
         PermissionKey.BROADCAST_VIEW,
         PermissionKey.VIEW_TEAM_ACTIVITY,
         PermissionKey.VIEW_TEAM_PROGRESS
     ],
-    [User_1.UserRole.MANAGER]: [
+    [ROLE.MANAGER]: [
         PermissionKey.BROADCAST_VIEW,
         PermissionKey.VIEW_TEAM_ACTIVITY
     ],
-    [User_1.UserRole.MEMBER]: [
+    [ROLE.MEMBER]: [
         PermissionKey.BROADCAST_VIEW
     ],
-    [User_1.UserRole.GUEST]: []
+    [ROLE.GUEST]: []
 };
 function normalizeRole(input) {
     if (!input) {
-        return User_1.UserRole.GUEST;
+        return ROLE.GUEST;
     }
-    if (Object.values(User_1.UserRole).includes(input)) {
+    if (Object.values(ROLE).includes(input)) {
         return input;
     }
     if (LEGACY_ROLE_ALIAS[input]) {
         return LEGACY_ROLE_ALIAS[input];
     }
-    return User_1.UserRole.GUEST;
+    return ROLE.GUEST;
 }
 function hasMinimumRole(inputRole, minimumRole) {
     const normalized = normalizeRole(inputRole);

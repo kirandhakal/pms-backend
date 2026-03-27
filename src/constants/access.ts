@@ -1,4 +1,16 @@
-import { UserRole } from "../entities/User";
+import type { UserRole } from "../entities/User";
+
+const ROLE = {
+    SUDO_ADMIN: "SUDO_ADMIN",
+    SUPER_ADMIN: "SUPER_ADMIN",
+    ADMIN: "ADMIN",
+    DEPARTMENT_HEAD: "DEPARTMENT_HEAD",
+    MANAGER: "MANAGER",
+    MEMBER: "MEMBER",
+    GUEST: "GUEST"
+} as const;
+
+type AccessRole = typeof ROLE[keyof typeof ROLE];
 
 export enum PermissionKey {
     PROJECT_CREATE = "PROJECT_CREATE",
@@ -11,20 +23,20 @@ export enum PermissionKey {
     ROLE_ASSIGN = "ROLE_ASSIGN"
 }
 
-const LEGACY_ROLE_ALIAS: Record<string, UserRole> = {
-    SuperAdmin: UserRole.SUPER_ADMIN,
-    ProjectManager: UserRole.MANAGER,
-    TeamMember: UserRole.MEMBER
+const LEGACY_ROLE_ALIAS: Record<string, AccessRole> = {
+    SuperAdmin: ROLE.SUPER_ADMIN,
+    ProjectManager: ROLE.MANAGER,
+    TeamMember: ROLE.MEMBER
 };
 
-export const ROLE_LEVEL: Record<UserRole, number> = {
-    [UserRole.SUDO_ADMIN]: 0,
-    [UserRole.SUPER_ADMIN]: 1,
-    [UserRole.ADMIN]: 2,
-    [UserRole.DEPARTMENT_HEAD]: 3,
-    [UserRole.MANAGER]: 4,
-    [UserRole.MEMBER]: 5,
-    [UserRole.GUEST]: 6
+export const ROLE_LEVEL: Record<AccessRole, number> = {
+    [ROLE.SUDO_ADMIN]: 0,
+    [ROLE.SUPER_ADMIN]: 1,
+    [ROLE.ADMIN]: 2,
+    [ROLE.DEPARTMENT_HEAD]: 3,
+    [ROLE.MANAGER]: 4,
+    [ROLE.MEMBER]: 5,
+    [ROLE.GUEST]: 6
 };
 
 export const CREATOR_CONTROLLED_PERMISSIONS = new Set<PermissionKey>([
@@ -35,8 +47,8 @@ export const CREATOR_CONTROLLED_PERMISSIONS = new Set<PermissionKey>([
     PermissionKey.ROLE_ASSIGN
 ]);
 
-export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, PermissionKey[]> = {
-    [UserRole.SUDO_ADMIN]: [
+export const DEFAULT_ROLE_PERMISSIONS: Record<AccessRole, PermissionKey[]> = {
+    [ROLE.SUDO_ADMIN]: [
         PermissionKey.PROJECT_CREATE,
         PermissionKey.VIEW_TEAM_ACTIVITY,
         PermissionKey.VIEW_TEAM_ANALYTICS,
@@ -46,7 +58,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, PermissionKey[]> = {
         PermissionKey.MEMBER_MANAGE,
         PermissionKey.ROLE_ASSIGN
     ],
-    [UserRole.SUPER_ADMIN]: [
+    [ROLE.SUPER_ADMIN]: [
         PermissionKey.PROJECT_CREATE,
         PermissionKey.VIEW_TEAM_ACTIVITY,
         PermissionKey.VIEW_TEAM_ANALYTICS,
@@ -56,42 +68,42 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, PermissionKey[]> = {
         PermissionKey.MEMBER_MANAGE,
         PermissionKey.ROLE_ASSIGN
     ],
-    [UserRole.ADMIN]: [
+    [ROLE.ADMIN]: [
         PermissionKey.BROADCAST_SEND,
         PermissionKey.BROADCAST_VIEW,
         PermissionKey.MEMBER_MANAGE,
         PermissionKey.VIEW_TEAM_ACTIVITY,
         PermissionKey.VIEW_TEAM_PROGRESS
     ],
-    [UserRole.DEPARTMENT_HEAD]: [
+    [ROLE.DEPARTMENT_HEAD]: [
         PermissionKey.BROADCAST_VIEW,
         PermissionKey.VIEW_TEAM_ACTIVITY,
         PermissionKey.VIEW_TEAM_PROGRESS
     ],
-    [UserRole.MANAGER]: [
+    [ROLE.MANAGER]: [
         PermissionKey.BROADCAST_VIEW,
         PermissionKey.VIEW_TEAM_ACTIVITY
     ],
-    [UserRole.MEMBER]: [
+    [ROLE.MEMBER]: [
         PermissionKey.BROADCAST_VIEW
     ],
-    [UserRole.GUEST]: []
+    [ROLE.GUEST]: []
 };
 
 export function normalizeRole(input?: string | UserRole | null): UserRole {
     if (!input) {
-        return UserRole.GUEST;
+        return ROLE.GUEST as UserRole;
     }
 
-    if (Object.values(UserRole).includes(input as UserRole)) {
+    if (Object.values(ROLE).includes(input as AccessRole)) {
         return input as UserRole;
     }
 
     if (LEGACY_ROLE_ALIAS[input]) {
-        return LEGACY_ROLE_ALIAS[input];
+        return LEGACY_ROLE_ALIAS[input] as UserRole;
     }
 
-    return UserRole.GUEST;
+    return ROLE.GUEST as UserRole;
 }
 
 export function hasMinimumRole(inputRole: string | UserRole | undefined, minimumRole: UserRole): boolean {
