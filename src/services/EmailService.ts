@@ -6,25 +6,33 @@ function parseBool(value?: string): boolean {
     return String(value).toLowerCase() === "true";
 }
 
+function firstNonEmpty(...values: Array<string | undefined>) {
+    return values.find((value) => Boolean(value && value.trim().length > 0));
+}
+
 function createInviteUrl(token: string, email: string) {
     const frontendUrl = process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL;
     return `${frontendUrl.replace(/\/$/, "")}/?token=${token}&email=${encodeURIComponent(email)}`;
 }
 
 export class EmailService {
-    private readonly from = process.env.SMTP_FROM || "no-reply@taskflow.local";
+    private readonly from = firstNonEmpty(process.env.SMTP_FROM, process.env.MAIL_FROM) || "no-reply@taskflow.local";
 
     private getTransporter() {
-        const host = process.env.SMTP_HOST;
-        const user = process.env.SMTP_USER;
-        const pass = process.env.SMTP_PASS;
+        const host = firstNonEmpty(process.env.SMTP_HOST, process.env.MAIL_HOST);
+        const user = firstNonEmpty(process.env.SMTP_USER, process.env.MAIL_USERNAME);
+        const rawPass = firstNonEmpty(process.env.SMTP_PASS, process.env.MAIL_PASSWORD);
+        const pass = host?.includes("gmail.com") ? rawPass?.replace(/\s+/g, "") : rawPass;
 
         if (!host || !user || !pass) {
+            console.warn("SMTP is not configured. Missing one or more of SMTP_HOST/MAIL_HOST, SMTP_USER/MAIL_USERNAME, SMTP_PASS/MAIL_PASSWORD.");
             return null;
         }
 
-        const secure = parseBool(process.env.SMTP_SECURE);
-        const port = Number(process.env.SMTP_PORT || (secure ? 465 : 587));
+        const secureRaw = firstNonEmpty(process.env.SMTP_SECURE, process.env.MAIL_SECURE);
+        const portRaw = firstNonEmpty(process.env.SMTP_PORT, process.env.MAIL_PORT);
+        const secure = secureRaw ? parseBool(secureRaw) : Number(portRaw || 587) === 465;
+        const port = Number(portRaw || (secure ? 465 : 587));
 
         return nodemailer.createTransport({
             host,
@@ -40,8 +48,12 @@ export class EmailService {
     async sendInvitation(params: { email: string; token: string; organizationName: string; inviterName: string; role: string }) {
         const transporter = this.getTransporter();
         if (!transporter) {
-            console.warn("SMTP is not configured. Invitation email was not sent.");
-            return { sent: false, inviteUrl: createInviteUrl(params.token, params.email) };
+            console.warn("Invitation email was skipped because SMTP is not configured.");
+            return {
+                sent: false,
+                inviteUrl: createInviteUrl(params.token, params.email),
+                error: "SMTP is not configured"
+            };
         }
 
         const inviteUrl = createInviteUrl(params.token, params.email);
@@ -60,13 +72,19 @@ export class EmailService {
             <p>This invitation expires in 48 hours.</p>
         `;
 
-        await transporter.sendMail({
-            from: this.from,
-            to: params.email,
-            subject,
-            text,
-            html
-        });
+        try {
+            await transporter.sendMail({
+                from: this.from,
+                to: params.email,
+                subject,
+                text,
+                html
+            });
+        } catch (error: any) {
+            const message = error?.message || "Unknown SMTP error";
+            console.error(`Failed to send invitation email: ${message}`);
+            return { sent: false, inviteUrl, error: message };
+        }
 
         return { sent: true, inviteUrl };
     }
@@ -74,17 +92,22 @@ export class EmailService {
     async sendOtp(params: { email: string; otp: string }) {
         const transporter = this.getTransporter();
         if (!transporter) {
-            console.warn("SMTP is not configured. OTP email was not sent.");
+            console.warn("OTP email was skipped because SMTP is not configured.");
             return { sent: false };
         }
 
-        await transporter.sendMail({
-            from: this.from,
-            to: params.email,
-            subject: "Your password reset OTP",
-            text: `Your password reset OTP is ${params.otp}. It expires in 10 minutes.`,
-            html: `<p>Your password reset OTP is <strong>${params.otp}</strong>. It expires in 10 minutes.</p>`
-        });
+        try {
+            await transporter.sendMail({
+                from: this.from,
+                to: params.email,
+                subject: "Your password reset OTP",
+                text: `Your password reset OTP is ${params.otp}. It expires in 10 minutes.`,
+                html: `<p>Your password reset OTP is <strong>${params.otp}</strong>. It expires in 10 minutes.</p>`
+            });
+        } catch (error: any) {
+            console.error(`Failed to send OTP email: ${error?.message || "Unknown SMTP error"}`);
+            return { sent: false };
+        }
 
         return { sent: true };
     }

@@ -32,6 +32,11 @@ export class InviteService {
             role
         });
 
-        return { inviteUrl: emailResult.inviteUrl, token };
+        return {
+            inviteUrl: emailResult.inviteUrl,
+            token,
+            emailSent: emailResult.sent,
+            emailError: (emailResult as { error?: string }).error
+        };
     }
 }

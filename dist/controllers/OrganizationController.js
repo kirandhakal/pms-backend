@@ -54,7 +54,10 @@ class OrganizationController {
             const teamId = String(req.params.teamId);
             const { email, role } = req.body;
             const result = await organizationService.inviteMember(actorId, teamId, email, role);
-            res.json(result);
+            res.json({
+                message: result.emailSent ? "Invitation email sent" : "Invitation created but email was not sent",
+                ...result
+            });
         }
         catch (err) {
             res.status(400).json({ message: err.message });

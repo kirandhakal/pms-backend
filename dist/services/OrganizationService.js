@@ -142,9 +142,17 @@ class OrganizationService {
             inviterName: actor.name,
             role: (0, access_1.normalizeRole)(role)
         });
+        if (emailResult.sent) {
+            console.log(`Invitation email sent to ${email}`);
+        }
+        else {
+            console.warn(`Invitation created but email send failed for ${email}. Reason: ${emailResult.error || "Unknown"}`);
+        }
         return {
             token,
-            inviteUrl: emailResult.inviteUrl
+            inviteUrl: emailResult.inviteUrl,
+            emailSent: emailResult.sent,
+            emailError: emailResult.error
         };
     }
     async addMemberManually(actorId, teamId, name, email, role) {

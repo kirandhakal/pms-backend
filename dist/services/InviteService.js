@@ -32,7 +32,12 @@ class InviteService {
             inviterName: "Team Admin",
             role
         });
-        return { inviteUrl: emailResult.inviteUrl, token };
+        return {
+            inviteUrl: emailResult.inviteUrl,
+            token,
+            emailSent: emailResult.sent,
+            emailError: emailResult.error
+        };
     }
 }
 exports.InviteService = InviteService;
