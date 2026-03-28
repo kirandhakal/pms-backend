@@ -1,7 +1,7 @@
 import { AppDataSource } from "../config/data-source";
 import { Project } from "../entities/Project";
 import { Task, TaskStatus } from "../entities/Task";
-import { User } from "../entities/User";
+import { User, UserRole } from "../entities/User";
 import { PermissionService } from "./PermissionService";
 import { PermissionKey } from "../constants/access";
 import { Team } from "../entities/Team";
@@ -29,9 +29,72 @@ export class ProjectService {
     private projectPermissionRepo = AppDataSource.getRepository(ProjectPermission);
     private permissionService = new PermissionService();
 
+    private isOrganizationCreator(actor: User) {
+        if (actor.team?.createdBy?.id) {
+            return actor.team.createdBy.id === actor.id;
+        }
+
+        // Backward compatibility for organizations created before createdBy was persisted.
+        return actor.role === UserRole.SUPER_ADMIN || actor.role === UserRole.SUDO_ADMIN;
+    }
+
     private sanitizeProjectPermissions(permissions: ProjectPermissionKey[]) {
         const deduped = Array.from(new Set(permissions || []));
         return deduped.filter((permission) => ALL_PROJECT_PERMISSIONS.includes(permission));
+    }
+
+    private async ensureProjectAccessContext(actorId: string, projectId: string) {
+        const actor = await this.userRepo.findOne({
+            where: { id: actorId },
+            relations: ["team", "team.createdBy"]
+        });
+
+        if (!actor || !actor.team?.id) {
+            throw new Error("Only organization members can access projects");
+        }
+
+        const project = await this.projectRepo.findOne({
+            where: { id: projectId },
+            relations: ["team", "team.createdBy"]
+        });
+
+        if (!project || project.team?.id !== actor.team.id) {
+            throw new Error("Project not found in your organization");
+        }
+
+        return { actor, project };
+    }
+
+    private async ensureProjectMemberManager(actorId: string, projectId: string) {
+        const { actor, project } = await this.ensureProjectAccessContext(actorId, projectId);
+
+        const isOrganizationCreator = this.isOrganizationCreator(actor);
+        if (isOrganizationCreator) {
+            return { actor, project };
+        }
+
+        const canManageMembers = await this.projectPermissionRepo.findOne({
+            where: {
+                project: { id: projectId },
+                user: { id: actorId },
+                permission: ProjectPermissionKey.PROJECT_MEMBER_MANAGE
+            }
+        });
+
+        if (!canManageMembers) {
+            throw new Error("You do not have permission to manage project members");
+        }
+
+        return { actor, project };
+    }
+
+    private async ensureProjectPermissionReader(actorId: string, projectId: string, memberId: string) {
+        const context = await this.ensureProjectAccessContext(actorId, projectId);
+        if (actorId === memberId) {
+            return context;
+        }
+
+        return this.ensureProjectMemberManager(actorId, projectId);
     }
 
     private async validateProjectMembers(teamId: string, memberPermissions: CreateProjectMemberPermission[]) {
@@ -62,9 +125,14 @@ export class ProjectService {
             throw new Error("Only organization members can create projects");
         }
 
+        const isOrganizationCreator = this.isOrganizationCreator(actor);
+        if (!isOrganizationCreator) {
+            throw new Error("Only the organization creator can create projects");
+        }
+
         const canCreateProject = await this.permissionService.userHasPermission(actor, PermissionKey.PROJECT_CREATE);
         if (!canCreateProject) {
-            throw new Error("You do not have permission to create projects");
+            throw new Error("You do not have permission to create projects in this organization");
         }
 
         if ((data as any).team?.id && (data as any).team.id !== actor.team.id) {
@@ -137,6 +205,76 @@ export class ProjectService {
             where: { id: savedProject.id },
             relations: ["manager", "team", "projectPermissions", "projectPermissions.user"]
         });
+    }
+
+    async getProjectMemberPermissions(actorId: string, projectId: string, memberId: string) {
+        await this.ensureProjectPermissionReader(actorId, projectId, memberId);
+
+        const member = await this.userRepo.findOne({
+            where: { id: memberId },
+            relations: ["team"]
+        });
+
+        if (!member) {
+            throw new Error("Project member not found");
+        }
+
+        const project = await this.projectRepo.findOne({
+            where: { id: projectId },
+            relations: ["team"]
+        });
+
+        if (!project || !project.team?.id || member.team?.id !== project.team.id) {
+            throw new Error("Project member must belong to the same organization");
+        }
+
+        const explicit = await this.projectPermissionRepo.find({
+            where: {
+                project: { id: projectId },
+                user: { id: memberId }
+            }
+        });
+
+        return {
+            projectId,
+            memberId,
+            explicitPermissions: explicit.map((entry) => entry.permission)
+        };
+    }
+
+    async setProjectMemberPermissions(actorId: string, projectId: string, memberId: string, permissions: ProjectPermissionKey[]) {
+        const { actor, project } = await this.ensureProjectMemberManager(actorId, projectId);
+
+        const member = await this.userRepo.findOne({
+            where: { id: memberId },
+            relations: ["team"]
+        });
+
+        if (!member || member.team?.id !== project.team?.id) {
+            throw new Error("Project member must belong to the same organization");
+        }
+
+        const validPermissions = this.sanitizeProjectPermissions(permissions || []);
+
+        await this.projectPermissionRepo.delete({
+            project: { id: projectId },
+            user: { id: memberId }
+        });
+
+        if (validPermissions.length > 0) {
+            const rows = validPermissions.map((permission) =>
+                this.projectPermissionRepo.create({
+                    project: { id: projectId } as Project,
+                    user: { id: memberId } as User,
+                    grantedBy: { id: actor.id } as User,
+                    permission
+                })
+            );
+
+            await this.projectPermissionRepo.save(rows);
+        }
+
+        return this.getProjectMemberPermissions(actorId, projectId, memberId);
     }
 
     async getProjects(actorId: string) {
