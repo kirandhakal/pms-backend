@@ -6,16 +6,7 @@ const taskService = new TaskService_1.TaskService();
 class TaskController {
     async create(req, res) {
         try {
-            const actorId = req.user?.id;
-            if (!actorId) {
-                res.status(401).json({ message: "Unauthorized" });
-                return;
-            }
-            const task = await taskService.createTask({
-                ...req.body,
-                ownerId: req.body.ownerId ?? actorId,
-                actorId
-            });
+            const task = await taskService.createTask(req.body);
             res.status(201).json(task);
         }
         catch (err) {
@@ -24,10 +15,13 @@ class TaskController {
     }
     async updateStatus(req, res) {
         try {
-            const taskId = req.params.taskId;
+            const taskIdParam = req.params.taskId;
+            if (!taskIdParam || Array.isArray(taskIdParam)) {
+                return res.status(400).json({ message: "taskId is required" });
+            }
             const { status, completion } = req.body;
-            const task = await taskService.updateTaskStatus(taskId, status, completion, req.user?.id);
-            res.json(task);
+            const updated = await taskService.updateTaskStatus(taskIdParam, status, completion);
+            res.json(updated);
         }
         catch (err) {
             res.status(400).json({ message: err.message });
@@ -35,12 +29,10 @@ class TaskController {
     }
     async getMyProgress(req, res) {
         try {
-            const userId = req.user?.id;
-            if (!userId) {
-                res.status(401).json({ message: "Unauthorized" });
-                return;
+            if (!req.user) {
+                return res.status(401).json({ message: "Unauthorized" });
             }
-            const progress = await taskService.getUserProgress(userId);
+            const progress = await taskService.getUserProgress(req.user.id);
             res.json(progress);
         }
         catch (err) {
@@ -49,19 +41,12 @@ class TaskController {
     }
     async getIndividualProgress(req, res) {
         try {
-            const userId = req.params.userId;
-            const progress = await taskService.getUserProgress(userId);
+            const userIdParam = req.params.userId;
+            if (!userIdParam || Array.isArray(userIdParam)) {
+                return res.status(400).json({ message: "userId is required" });
+            }
+            const progress = await taskService.getUserProgress(userIdParam);
             res.json(progress);
-        }
-        catch (err) {
-            res.status(500).json({ message: err.message });
-        }
-    }
-    async getOrganizationTaskHistory(req, res) {
-        try {
-            const teamId = req.params.teamId;
-            const history = await taskService.getOrganizationTaskHistory(teamId);
-            res.json(history);
         }
         catch (err) {
             res.status(500).json({ message: err.message });

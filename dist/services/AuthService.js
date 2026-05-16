@@ -4,86 +4,66 @@ exports.AuthService = void 0;
 const data_source_1 = require("../config/data-source");
 const User_1 = require("../entities/User");
 const Session_1 = require("../entities/Session");
-const Invitation_1 = require("../entities/Invitation");
 const auth_1 = require("../utils/auth");
-const typeorm_1 = require("typeorm");
-const ActivityLog_1 = require("../entities/ActivityLog");
-const ActivityLogService_1 = require("./ActivityLogService");
+const errorHandler_1 = require("../middlewares/errorHandler");
 class AuthService {
     constructor() {
         this.userRepo = data_source_1.AppDataSource.getRepository(User_1.User);
         this.sessionRepo = data_source_1.AppDataSource.getRepository(Session_1.Session);
-        this.inviteRepo = data_source_1.AppDataSource.getRepository(Invitation_1.Invitation);
-        this.activityLogService = new ActivityLogService_1.ActivityLogService();
     }
-    async registerIndividual(data) {
-        const { email, password, name } = data;
-        const existing = await this.userRepo.findOne({ where: { email } });
+    async register(data) {
+        const normalizedEmail = data.email.trim().toLowerCase();
+        const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
         if (existing) {
-            throw new Error("Email already registered");
+            throw new errorHandler_1.ApiError("Email is already in use", 409);
         }
-        const hashedPassword = await (0, auth_1.hashPassword)(password);
         const user = this.userRepo.create({
-            email,
-            name,
-            password: hashedPassword,
-            role: User_1.UserRole.TEAM_MEMBER
+            fullName: data.fullName,
+            email: normalizedEmail,
+            password: await (0, auth_1.hashPassword)(data.password),
+            legacyRole: User_1.UserRole.USER,
+            isActive: true
         });
-        return this.userRepo.save(user);
-    }
-    async registerWithInvite(data) {
-        return await data_source_1.AppDataSource.transaction(async (manager) => {
-            const { email, password, name, token } = data;
-            const existing = await manager.findOne(User_1.User, { where: { email } });
-            if (existing) {
-                throw new Error("Email already registered");
-            }
-            const invitation = await manager.findOne(Invitation_1.Invitation, {
-                where: { email, token, isUsed: false, expiresAt: (0, typeorm_1.MoreThan)(new Date()) },
-                relations: ["team"]
-            });
-            if (!invitation) {
-                throw new Error("Invalid or expired invitation");
-            }
-            const hashedPassword = await (0, auth_1.hashPassword)(password);
-            const user = manager.create(User_1.User, {
-                email,
-                name,
-                password: hashedPassword,
-                role: invitation.role,
-                team: invitation.team
-            });
-            const savedUser = await manager.save(user);
-            invitation.isUsed = true;
-            await manager.save(invitation);
-            if (invitation.team?.id) {
-                await this.activityLogService.log({
-                    action: ActivityLog_1.ActivityAction.MEMBER_JOINED,
-                    actorId: savedUser.id,
-                    targetUserId: savedUser.id,
-                    teamId: invitation.team.id,
-                    details: `${savedUser.email} joined via invite`
-                });
-            }
-            return savedUser;
-        });
+        const saved = await this.userRepo.save(user);
+        return {
+            id: saved.id,
+            fullName: saved.fullName,
+            email: saved.email,
+            legacyRole: saved.legacyRole,
+            isActive: saved.isActive,
+            createdAt: saved.createdAt,
+            updatedAt: saved.updatedAt
+        };
     }
     async login(email, password) {
+        const normalizedEmail = email.trim().toLowerCase();
         const user = await this.userRepo.findOne({
-            where: { email },
-            select: ["id", "password", "role", "name"]
+            where: { email: normalizedEmail },
+            select: ["id", "password", "legacyRole", "fullName", "email", "isActive"]
         });
         if (!user || !(await (0, auth_1.comparePassword)(password, user.password))) {
-            throw new Error("Invalid credentials");
+            throw new errorHandler_1.ApiError("Invalid credentials", 401);
         }
-        const token = (0, auth_1.generateToken)({ id: user.id, role: user.role });
+        if (!user.isActive) {
+            throw new errorHandler_1.ApiError("User account is inactive", 403);
+        }
+        const token = (0, auth_1.generateToken)({ id: user.id, legacyRole: user.legacyRole });
         const session = this.sessionRepo.create({
             user,
             token,
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
         });
         await this.sessionRepo.save(session);
-        return { token, user: { id: user.id, name: user.name, role: user.role } };
+        return {
+            token,
+            user: {
+                id: user.id,
+                fullName: user.fullName,
+                email: user.email,
+                legacyRole: user.legacyRole,
+                isActive: user.isActive
+            }
+        };
     }
     async logout(token) {
         const session = await this.sessionRepo.findOne({ where: { token } });
@@ -93,26 +73,121 @@ class AuthService {
         }
     }
     async getCurrentUser(userId) {
-        const user = await this.userRepo.findOne({
-            where: { id: userId },
-            relations: ["team"]
-        });
+        const user = await this.userRepo.findOne({ where: { id: userId } });
         if (!user) {
-            throw new Error("User not found");
+            throw new errorHandler_1.ApiError("User not found", 404);
         }
         return {
             id: user.id,
-            name: user.name,
+            fullName: user.fullName,
             email: user.email,
-            role: user.role,
-            team: user.team ? { id: user.team.id, name: user.team.name } : null
+            legacyRole: user.legacyRole,
+            isActive: user.isActive,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
         };
     }
-    // SuperAdmin initial setup (Internal or via first user logic)
+    async updateProfile(userId, data) {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) {
+            throw new errorHandler_1.ApiError("User not found", 404);
+        }
+        if (data.email && data.email !== user.email) {
+            const normalizedEmail = data.email.trim().toLowerCase();
+            const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
+            if (existing && existing.id !== userId) {
+                throw new errorHandler_1.ApiError("Email is already in use", 409);
+            }
+            user.email = normalizedEmail;
+        }
+        if (data.fullName) {
+            user.fullName = data.fullName;
+        }
+        const saved = await this.userRepo.save(user);
+        return {
+            id: saved.id,
+            fullName: saved.fullName,
+            email: saved.email,
+            legacyRole: saved.legacyRole,
+            isActive: saved.isActive,
+            createdAt: saved.createdAt,
+            updatedAt: saved.updatedAt
+        };
+    }
+    async changePassword(userId, currentPassword, newPassword) {
+        const user = await this.userRepo.findOne({
+            where: { id: userId },
+            select: ["id", "password"]
+        });
+        if (!user) {
+            throw new errorHandler_1.ApiError("User not found", 404);
+        }
+        const isMatch = await (0, auth_1.comparePassword)(currentPassword, user.password);
+        if (!isMatch) {
+            throw new errorHandler_1.ApiError("Current password is incorrect", 400);
+        }
+        user.password = await (0, auth_1.hashPassword)(newPassword);
+        await this.userRepo.save(user);
+        await this.sessionRepo
+            .createQueryBuilder()
+            .update(Session_1.Session)
+            .set({ isActive: false })
+            .where("\"userId\" = :userId", { userId })
+            .andWhere("\"isActive\" = :isActive", { isActive: true })
+            .execute();
+        return { message: "Password changed successfully. Please login again." };
+    }
+    async createAdmin(data) {
+        const normalizedEmail = data.email.trim().toLowerCase();
+        const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
+        if (existing) {
+            throw new errorHandler_1.ApiError("Email is already in use", 409);
+        }
+        const user = this.userRepo.create({
+            fullName: data.fullName,
+            email: normalizedEmail,
+            password: await (0, auth_1.hashPassword)(data.password),
+            legacyRole: User_1.UserRole.ADMIN,
+            isActive: true
+        });
+        const saved = await this.userRepo.save(user);
+        return {
+            id: saved.id,
+            fullName: saved.fullName,
+            email: saved.email,
+            legacyRole: saved.legacyRole,
+            isActive: saved.isActive,
+            createdAt: saved.createdAt,
+            updatedAt: saved.updatedAt
+        };
+    }
     async createSuperAdmin(data) {
-        const hashedPassword = await (0, auth_1.hashPassword)(data.password);
-        const user = this.userRepo.create({ ...data, password: hashedPassword, role: User_1.UserRole.SUPER_ADMIN });
-        return await this.userRepo.save(user);
+        const exists = await this.userRepo.findOne({ where: { legacyRole: User_1.UserRole.SUPER_ADMIN } });
+        if (exists) {
+            throw new errorHandler_1.ApiError("Super admin already exists", 409);
+        }
+        const normalizedEmail = data.email.trim().toLowerCase();
+        const existingEmail = await this.userRepo.findOne({ where: { email: normalizedEmail } });
+        if (existingEmail) {
+            throw new errorHandler_1.ApiError("Email is already in use", 409);
+        }
+        const user = this.userRepo.create({
+            fullName: data.fullName,
+            email: normalizedEmail,
+            password: await (0, auth_1.hashPassword)(data.password),
+            legacyRole: User_1.UserRole.SUPER_ADMIN,
+            isActive: true
+        });
+        const saved = await this.userRepo.save(user);
+        return {
+            id: saved.id,
+            fullName: saved.fullName,
+            email: saved.email,
+            legacyRole: saved.legacyRole,
+            isActive: saved.isActive,
+            createdAt: saved.createdAt,
+            updatedAt: saved.updatedAt
+        };
     }
 }
 exports.AuthService = AuthService;

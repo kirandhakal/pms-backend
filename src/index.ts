@@ -6,6 +6,7 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import { AppDataSource } from "./config/data-source";
 import routes from "./routes";
+import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 
 dotenv.config();
 
@@ -18,6 +19,8 @@ app.use(morgan("dev"));
 app.use(express.json());
 
 app.use("/api", routes);
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 AppDataSource.initialize()
     .then(() => {

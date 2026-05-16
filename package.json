@@ -6,37 +6,51 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "seed:permissions": "ts-node src/seeds/seedPermissions.ts",
+    "seed:roles": "ts-node src/seeds/seedDefaultRoles.ts",
+    "seed:admin": "ts-node src/seeds/seedSuperAdmin.ts",
+    "seed:all": "npm run seed:permissions && npm run seed:roles && npm run seed:admin",
+    "typeorm": "typeorm"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "argon2": "^0.44.0",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
+<<<<<<< HEAD
     "passport": "^0.7.0",
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
+=======
+    "nodemailer": "^8.0.1",
+>>>>>>> new/rafc
     "pg": "^8.18.0",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.28",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^25.2.1",
+<<<<<<< HEAD
     "@types/passport": "^1.0.17",
     "@types/passport-github2": "^1.2.9",
     "@types/passport-google-oauth20": "^2.0.17",
+=======
+    "@types/nodemailer": "^7.0.11",
+>>>>>>> new/rafc
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
   }

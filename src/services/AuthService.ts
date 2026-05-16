@@ -1,15 +1,19 @@
 import { AppDataSource } from "../config/data-source";
 import { User, UserRole } from "../entities/User";
 import { Session } from "../entities/Session";
-import { Invitation } from "../entities/Invitation";
 import { hashPassword, comparePassword, generateToken } from "../utils/auth";
+<<<<<<< HEAD
 import { MoreThan } from "typeorm";
 import { ActivityAction } from "../entities/ActivityLog";
 import { ActivityLogService } from "./ActivityLogService";
+=======
+import { ApiError } from "../middlewares/errorHandler";
+>>>>>>> new/rafc
 
 export class AuthService {
     private userRepo = AppDataSource.getRepository(User);
     private sessionRepo = AppDataSource.getRepository(Session);
+<<<<<<< HEAD
     private inviteRepo = AppDataSource.getRepository(Invitation);
     private activityLogService = new ActivityLogService();
 
@@ -31,11 +35,17 @@ export class AuthService {
 
         return this.userRepo.save(user);
     }
+=======
+>>>>>>> new/rafc
 
-    async registerWithInvite(data: any) {
-        return await AppDataSource.transaction(async (manager) => {
-            const { email, password, name, token } = data;
+    async register(data: { fullName: string; email: string; password: string }) {
+        const normalizedEmail = data.email.trim().toLowerCase();
+        const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
+        if (existing) {
+            throw new ApiError("Email is already in use", 409);
+        }
 
+<<<<<<< HEAD
             const existing = await manager.findOne(User, { where: { email } });
             if (existing) {
                 throw new Error("Email already registered");
@@ -75,20 +85,44 @@ export class AuthService {
             }
 
             return savedUser;
+=======
+        const user = this.userRepo.create({
+            fullName: data.fullName,
+            email: normalizedEmail,
+            password: await hashPassword(data.password),
+            legacyRole: UserRole.USER,
+            isActive: true
+>>>>>>> new/rafc
         });
+
+        const saved = await this.userRepo.save(user);
+        return {
+            id: saved.id,
+            fullName: saved.fullName,
+            email: saved.email,
+            legacyRole: saved.legacyRole,
+            isActive: saved.isActive,
+            createdAt: saved.createdAt,
+            updatedAt: saved.updatedAt
+        };
     }
 
     async login(email: string, password: string) {
+        const normalizedEmail = email.trim().toLowerCase();
         const user = await this.userRepo.findOne({
-            where: { email },
-            select: ["id", "password", "role", "name"]
+            where: { email: normalizedEmail },
+            select: ["id", "password", "legacyRole", "fullName", "email", "isActive"]
         });
 
         if (!user || !(await comparePassword(password, user.password))) {
-            throw new Error("Invalid credentials");
+            throw new ApiError("Invalid credentials", 401);
         }
 
-        const token = generateToken({ id: user.id, role: user.role });
+        if (!user.isActive) {
+            throw new ApiError("User account is inactive", 403);
+        }
+
+        const token = generateToken({ id: user.id, legacyRole: user.legacyRole });
 
         const session = this.sessionRepo.create({
             user,
@@ -98,7 +132,16 @@ export class AuthService {
 
         await this.sessionRepo.save(session);
 
-        return { token, user: { id: user.id, name: user.name, role: user.role } };
+        return {
+            token,
+            user: {
+                id: user.id,
+                fullName: user.fullName,
+                email: user.email,
+                legacyRole: user.legacyRole,
+                isActive: user.isActive
+            }
+        };
     }
 
     async logout(token: string) {
@@ -110,6 +153,7 @@ export class AuthService {
     }
 
     async getCurrentUser(userId: string) {
+<<<<<<< HEAD
         const user = await this.userRepo.findOne({
             where: { id: userId },
             relations: ["team"]
@@ -117,10 +161,16 @@ export class AuthService {
 
         if (!user) {
             throw new Error("User not found");
+=======
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) {
+            throw new ApiError("User not found", 404);
+>>>>>>> new/rafc
         }
 
         return {
             id: user.id,
+<<<<<<< HEAD
             name: user.name,
             email: user.email,
             role: user.role,
@@ -133,5 +183,135 @@ export class AuthService {
         const hashedPassword = await hashPassword(data.password);
         const user = this.userRepo.create({ ...data, password: hashedPassword, role: UserRole.SUPER_ADMIN });
         return await this.userRepo.save(user);
+=======
+            fullName: user.fullName,
+            email: user.email,
+            legacyRole: user.legacyRole,
+            isActive: user.isActive,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+        };
+    }
+
+    async updateProfile(userId: string, data: { fullName?: string; email?: string }) {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) {
+            throw new ApiError("User not found", 404);
+        }
+
+        if (data.email && data.email !== user.email) {
+            const normalizedEmail = data.email.trim().toLowerCase();
+            const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
+            if (existing && existing.id !== userId) {
+                throw new ApiError("Email is already in use", 409);
+            }
+            user.email = normalizedEmail;
+        }
+
+        if (data.fullName) {
+            user.fullName = data.fullName;
+        }
+
+        const saved = await this.userRepo.save(user);
+        return {
+            id: saved.id,
+            fullName: saved.fullName,
+            email: saved.email,
+            legacyRole: saved.legacyRole,
+            isActive: saved.isActive,
+            createdAt: saved.createdAt,
+            updatedAt: saved.updatedAt
+        };
+    }
+
+    async changePassword(userId: string, currentPassword: string, newPassword: string) {
+        const user = await this.userRepo.findOne({
+            where: { id: userId },
+            select: ["id", "password"]
+        });
+
+        if (!user) {
+            throw new ApiError("User not found", 404);
+        }
+
+        const isMatch = await comparePassword(currentPassword, user.password);
+        if (!isMatch) {
+            throw new ApiError("Current password is incorrect", 400);
+        }
+
+        user.password = await hashPassword(newPassword);
+        await this.userRepo.save(user);
+
+        await this.sessionRepo
+            .createQueryBuilder()
+            .update(Session)
+            .set({ isActive: false })
+            .where("\"userId\" = :userId", { userId })
+            .andWhere("\"isActive\" = :isActive", { isActive: true })
+            .execute();
+
+        return { message: "Password changed successfully. Please login again." };
+    }
+
+    async createAdmin(data: { fullName: string; email: string; password: string }) {
+        const normalizedEmail = data.email.trim().toLowerCase();
+        const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
+        if (existing) {
+            throw new ApiError("Email is already in use", 409);
+        }
+
+        const user = this.userRepo.create({
+            fullName: data.fullName,
+            email: normalizedEmail,
+            password: await hashPassword(data.password),
+            legacyRole: UserRole.ADMIN,
+            isActive: true
+        });
+
+        const saved = await this.userRepo.save(user);
+
+        return {
+            id: saved.id,
+            fullName: saved.fullName,
+            email: saved.email,
+            legacyRole: saved.legacyRole,
+            isActive: saved.isActive,
+            createdAt: saved.createdAt,
+            updatedAt: saved.updatedAt
+        };
+    }
+
+    async createSuperAdmin(data: { fullName: string; email: string; password: string }) {
+        const exists = await this.userRepo.findOne({ where: { legacyRole: UserRole.SUPER_ADMIN } });
+        if (exists) {
+            throw new ApiError("Super admin already exists", 409);
+        }
+
+        const normalizedEmail = data.email.trim().toLowerCase();
+        const existingEmail = await this.userRepo.findOne({ where: { email: normalizedEmail } });
+        if (existingEmail) {
+            throw new ApiError("Email is already in use", 409);
+        }
+
+        const user = this.userRepo.create({
+            fullName: data.fullName,
+            email: normalizedEmail,
+            password: await hashPassword(data.password),
+            legacyRole: UserRole.SUPER_ADMIN,
+            isActive: true
+        });
+
+        const saved = await this.userRepo.save(user);
+
+        return {
+            id: saved.id,
+            fullName: saved.fullName,
+            email: saved.email,
+            legacyRole: saved.legacyRole,
+            isActive: saved.isActive,
+            createdAt: saved.createdAt,
+            updatedAt: saved.updatedAt
+        };
+>>>>>>> new/rafc
     }
 }
