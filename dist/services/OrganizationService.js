@@ -1,281 +1,213 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.organizationService = exports.OrganizationService = void 0;
+exports.OrganizationService = void 0;
+const crypto_1 = __importDefault(require("crypto"));
+const typeorm_1 = require("typeorm");
 const data_source_1 = require("../config/data-source");
-const Organization_1 = require("../entities/Organization");
-const Department_1 = require("../entities/Department");
+const Team_1 = require("../entities/Team");
+const Invitation_1 = require("../entities/Invitation");
 const User_1 = require("../entities/User");
-const WorkflowEngine_1 = require("./WorkflowEngine");
-const errorHandler_1 = require("../middlewares/errorHandler");
+const auth_1 = require("../utils/auth");
+const ActivityLog_1 = require("../entities/ActivityLog");
+const ActivityLogService_1 = require("./ActivityLogService");
 class OrganizationService {
     constructor() {
-        this.orgRepo = data_source_1.AppDataSource.getRepository(Organization_1.Organization);
-        this.deptRepo = data_source_1.AppDataSource.getRepository(Department_1.Department);
+        this.teamRepo = data_source_1.AppDataSource.getRepository(Team_1.Team);
         this.userRepo = data_source_1.AppDataSource.getRepository(User_1.User);
+        this.inviteRepo = data_source_1.AppDataSource.getRepository(Invitation_1.Invitation);
+        this.activityLogService = new ActivityLogService_1.ActivityLogService();
     }
-    /**
-     * Create a new organization
-     */
-    async createOrganization(data) {
-        // Generate slug if not provided
-        const slug = data.slug || this.generateSlug(data.name);
-        // Check slug uniqueness
-        const existing = await this.orgRepo.findOne({ where: { slug } });
-        if (existing) {
-            throw new errorHandler_1.ApiError("Organization slug already exists", 409);
-        }
-        const organization = this.orgRepo.create({
-            name: data.name,
-            slug,
-            description: data.description,
-            ownerId: data.ownerId,
-            settings: data.settings || {
-                features: {
-                    guestAccess: true,
-                    departmentVisibility: true,
-                    auditLogging: true
-                }
-            },
-            isActive: true
+    async ensureOrgAdmin(actorId, teamId) {
+        const actor = await this.userRepo.findOne({
+            where: { id: actorId },
+            relations: ["team"]
         });
-        const saved = await this.orgRepo.save(organization);
-        // Create default workflow for organization
-        await WorkflowEngine_1.workflowEngine.getOrCreateDefaultWorkflow(saved.id, data.ownerId);
-        return saved;
-    }
-    /**
-     * Get organization by ID
-     */
-    async getOrganizationById(id, includeRelations = false) {
-        if (includeRelations) {
-            return this.orgRepo.findOne({
-                where: { id },
-                relations: ["departments", "users", "workflows"]
-            });
+        if (!actor) {
+            throw new Error("Actor user not found");
         }
-        return this.orgRepo.findOne({ where: { id } });
-    }
-    /**
-     * Get organization by slug
-     */
-    async getOrganizationBySlug(slug) {
-        return this.orgRepo.findOne({ where: { slug } });
-    }
-    /**
-     * List all organizations (for system admins)
-     */
-    async listOrganizations(filters) {
-        const query = this.orgRepo.createQueryBuilder("org")
-            .orderBy("org.createdAt", "DESC");
-        if (filters?.isActive !== undefined) {
-            query.andWhere("org.isActive = :isActive", { isActive: filters.isActive });
+        const sameTeam = actor.team?.id === teamId;
+        const canManage = actor.role === User_1.UserRole.SUPER_ADMIN || (sameTeam && actor.role === User_1.UserRole.PROJECT_MANAGER);
+        if (!canManage) {
+            throw new Error("You do not have permission to manage this organization");
         }
-        if (filters?.search) {
-            query.andWhere("(org.name ILIKE :search OR org.slug ILIKE :search)", {
-                search: `%${filters.search}%`
-            });
-        }
-        const page = filters?.page || 1;
-        const limit = filters?.limit || 20;
-        const skip = (page - 1) * limit;
-        const [organizations, total] = await query
-            .skip(skip)
-            .take(limit)
-            .getManyAndCount();
-        return { organizations, total };
+        return actor;
     }
-    /**
-     * Update organization
-     */
-    async updateOrganization(id, data) {
-        const org = await this.orgRepo.findOne({ where: { id } });
-        if (!org) {
-            throw new errorHandler_1.ApiError("Organization not found", 404);
+    async createOrganization(actorId, name) {
+        const actor = await this.userRepo.findOne({ where: { id: actorId } });
+        if (!actor) {
+            throw new Error("User not found");
         }
-        if (data.name)
-            org.name = data.name;
-        if (data.description !== undefined)
-            org.description = data.description;
-        if (data.settings)
-            org.settings = { ...org.settings, ...data.settings };
-        if (data.isActive !== undefined)
-            org.isActive = data.isActive;
-        return this.orgRepo.save(org);
-    }
-    /**
-     * Delete organization (soft delete)
-     */
-    async deleteOrganization(id) {
-        const org = await this.orgRepo.findOne({ where: { id } });
-        if (!org) {
-            throw new errorHandler_1.ApiError("Organization not found", 404);
+        const existing = await this.teamRepo.findOne({ where: { name } });
+        if (existing) {
+            throw new Error("Organization with this name already exists");
         }
-        org.isActive = false;
-        await this.orgRepo.save(org);
+        const team = this.teamRepo.create({ name });
+        const savedTeam = await this.teamRepo.save(team);
+        actor.team = savedTeam;
+        if (actor.role !== User_1.UserRole.SUPER_ADMIN) {
+            actor.role = User_1.UserRole.PROJECT_MANAGER;
+        }
+        await this.userRepo.save(actor);
+        await this.activityLogService.log({
+            action: ActivityLog_1.ActivityAction.ORGANIZATION_CREATED,
+            actorId,
+            teamId: savedTeam.id,
+            details: `${actor.name} created organization ${savedTeam.name}`
+        });
+        return savedTeam;
     }
-    /**
-     * Get organization statistics
-     */
-    async getOrganizationStats(id) {
-        const userCount = await this.userRepo.count({ where: { organizationId: id } });
-        const activeUserCount = await this.userRepo.count({ where: { organizationId: id, isActive: true } });
-        const departmentCount = await this.deptRepo.count({ where: { organizationId: id, isActive: true } });
-        // Would need Task and Workflow repositories for full stats
+    async searchOrganizations(query) {
+        const where = query ? { name: (0, typeorm_1.ILike)(`%${query}%`) } : {};
+        const teams = await this.teamRepo.find({
+            where,
+            relations: ["members"],
+            order: { createdAt: "DESC" },
+            take: 30
+        });
+        return teams.map((team) => ({
+            id: team.id,
+            name: team.name,
+            createdAt: team.createdAt,
+            membersCount: team.members?.length ?? 0
+        }));
+    }
+    async joinOrganization(actorId, teamId) {
+        const user = await this.userRepo.findOne({ where: { id: actorId }, relations: ["team"] });
+        if (!user) {
+            throw new Error("User not found");
+        }
+        const team = await this.teamRepo.findOne({ where: { id: teamId } });
+        if (!team) {
+            throw new Error("Organization not found");
+        }
+        user.team = team;
+        if (user.role !== User_1.UserRole.SUPER_ADMIN && user.role !== User_1.UserRole.PROJECT_MANAGER) {
+            user.role = User_1.UserRole.TEAM_MEMBER;
+        }
+        const savedUser = await this.userRepo.save(user);
+        await this.activityLogService.log({
+            action: ActivityLog_1.ActivityAction.MEMBER_JOINED,
+            actorId,
+            targetUserId: actorId,
+            teamId,
+            details: `${savedUser.name} joined ${team.name}`
+        });
+        return savedUser;
+    }
+    async inviteMember(actorId, teamId, email, role) {
+        await this.ensureOrgAdmin(actorId, teamId);
+        const token = crypto_1.default.randomBytes(32).toString("hex");
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 48);
+        const invite = this.inviteRepo.create({
+            email,
+            token,
+            role,
+            team: { id: teamId },
+            expiresAt,
+            isUsed: false
+        });
+        await this.inviteRepo.save(invite);
+        await this.activityLogService.log({
+            action: ActivityLog_1.ActivityAction.MEMBER_INVITED,
+            actorId,
+            teamId,
+            details: `Invitation sent to ${email} with role ${role}`
+        });
         return {
-            userCount,
-            activeUserCount,
-            departmentCount,
-            taskCount: 0, // TODO: Implement
-            workflowCount: 0 // TODO: Implement
+            token,
+            inviteUrl: `http://localhost:3000/register?token=${token}&email=${encodeURIComponent(email)}`
         };
     }
-    // ==================== Department Methods ====================
-    /**
-     * Create department
-     */
-    async createDepartment(data) {
-        // Verify organization exists
-        const org = await this.orgRepo.findOne({ where: { id: data.organizationId } });
-        if (!org) {
-            throw new errorHandler_1.ApiError("Organization not found", 404);
+    async addMemberManually(actorId, teamId, name, email, role) {
+        await this.ensureOrgAdmin(actorId, teamId);
+        const team = await this.teamRepo.findOne({ where: { id: teamId } });
+        if (!team) {
+            throw new Error("Organization not found");
         }
-        // Verify manager exists if provided
-        if (data.managerId) {
-            const manager = await this.userRepo.findOne({ where: { id: data.managerId } });
-            if (!manager) {
-                throw new errorHandler_1.ApiError("Manager not found", 404);
-            }
+        const existingUser = await this.userRepo.findOne({ where: { email }, relations: ["team"] });
+        let savedUser;
+        if (existingUser) {
+            existingUser.name = name || existingUser.name;
+            existingUser.role = role;
+            existingUser.team = team;
+            savedUser = await this.userRepo.save(existingUser);
         }
-        const department = this.deptRepo.create({
-            name: data.name,
-            description: data.description,
-            organizationId: data.organizationId,
-            managerId: data.managerId,
-            isVisible: data.isVisible ?? true,
-            isActive: true
+        else {
+            const tempPassword = crypto_1.default.randomBytes(8).toString("hex");
+            const hashedPassword = await (0, auth_1.hashPassword)(tempPassword);
+            const createdUser = this.userRepo.create({
+                name,
+                email,
+                password: hashedPassword,
+                role,
+                oauthProvider: User_1.OAuthProvider.LOCAL,
+                team
+            });
+            savedUser = await this.userRepo.save(createdUser);
+        }
+        await this.activityLogService.log({
+            action: ActivityLog_1.ActivityAction.MEMBER_ADDED,
+            actorId,
+            targetUserId: savedUser.id,
+            teamId,
+            details: `${savedUser.email} added manually with role ${role}`
         });
-        return this.deptRepo.save(department);
+        return savedUser;
     }
-    /**
-     * Get department by ID
-     */
-    async getDepartmentById(id, includeMembers = false) {
-        const relations = includeMembers ? ["members", "manager"] : ["manager"];
-        return this.deptRepo.findOne({
-            where: { id },
-            relations
+    async updateMemberRole(actorId, teamId, memberId, role) {
+        await this.ensureOrgAdmin(actorId, teamId);
+        const member = await this.userRepo.findOne({ where: { id: memberId }, relations: ["team"] });
+        if (!member || member.team?.id !== teamId) {
+            throw new Error("Member not found in organization");
+        }
+        member.role = role;
+        const saved = await this.userRepo.save(member);
+        await this.activityLogService.log({
+            action: ActivityLog_1.ActivityAction.MEMBER_ROLE_UPDATED,
+            actorId,
+            targetUserId: memberId,
+            teamId,
+            details: `${saved.email} role changed to ${role}`
         });
+        return saved;
     }
-    /**
-     * List departments in organization
-     */
-    async listDepartments(organizationId, options) {
-        const query = this.deptRepo.createQueryBuilder("dept")
-            .leftJoinAndSelect("dept.manager", "manager")
-            .where("dept.organizationId = :organizationId", { organizationId })
-            .andWhere("dept.isActive = :isActive", { isActive: true })
-            .orderBy("dept.name", "ASC");
-        if (!options?.includeInvisible) {
-            query.andWhere("dept.isVisible = :isVisible", { isVisible: true });
+    async removeMember(actorId, teamId, memberId) {
+        await this.ensureOrgAdmin(actorId, teamId);
+        const member = await this.userRepo.findOne({ where: { id: memberId }, relations: ["team"] });
+        if (!member || member.team?.id !== teamId) {
+            throw new Error("Member not found in organization");
         }
-        if (options?.includeMembers) {
-            query.leftJoinAndSelect("dept.members", "members");
+        member.team = undefined;
+        if (member.role !== User_1.UserRole.SUPER_ADMIN) {
+            member.role = User_1.UserRole.TEAM_MEMBER;
         }
-        return query.getMany();
+        const saved = await this.userRepo.save(member);
+        await this.activityLogService.log({
+            action: ActivityLog_1.ActivityAction.MEMBER_REMOVED,
+            actorId,
+            targetUserId: memberId,
+            teamId,
+            details: `${saved.email} removed from organization`
+        });
+        return { id: saved.id, email: saved.email };
     }
-    /**
-     * Update department
-     */
-    async updateDepartment(id, data) {
-        const dept = await this.deptRepo.findOne({ where: { id } });
-        if (!dept) {
-            throw new errorHandler_1.ApiError("Department not found", 404);
-        }
-        Object.assign(dept, data);
-        return this.deptRepo.save(dept);
-    }
-    /**
-     * Delete department (soft delete)
-     */
-    async deleteDepartment(id) {
-        const dept = await this.deptRepo.findOne({
-            where: { id },
+    async getMembers(teamId) {
+        const team = await this.teamRepo.findOne({
+            where: { id: teamId },
             relations: ["members"]
         });
-        if (!dept) {
-            throw new errorHandler_1.ApiError("Department not found", 404);
+        if (!team) {
+            throw new Error("Organization not found");
         }
-        // Check for members
-        if (dept.members?.length > 0) {
-            throw new errorHandler_1.ApiError("Cannot delete department with members. Reassign members first.", 400);
-        }
-        dept.isActive = false;
-        await this.deptRepo.save(dept);
+        return team.members;
     }
-    /**
-     * Add member to department
-     */
-    async addMemberToDepartment(departmentId, userId) {
-        const [dept, user] = await Promise.all([
-            this.deptRepo.findOne({ where: { id: departmentId } }),
-            this.userRepo.findOne({ where: { id: userId } })
-        ]);
-        if (!dept) {
-            throw new errorHandler_1.ApiError("Department not found", 404);
-        }
-        if (!user) {
-            throw new errorHandler_1.ApiError("User not found", 404);
-        }
-        // Verify same organization
-        if (user.organizationId && user.organizationId !== dept.organizationId) {
-            throw new errorHandler_1.ApiError("User belongs to different organization", 400);
-        }
-        user.departmentId = departmentId;
-        user.organizationId = dept.organizationId;
-        return this.userRepo.save(user);
-    }
-    /**
-     * Remove member from department
-     */
-    async removeMemberFromDepartment(departmentId, userId) {
-        const user = await this.userRepo.findOne({ where: { id: userId, departmentId } });
-        if (!user) {
-            throw new errorHandler_1.ApiError("User not found in department", 404);
-        }
-        user.departmentId = undefined;
-        return this.userRepo.save(user);
-    }
-    /**
-     * Assign manager to department
-     */
-    async assignManager(departmentId, managerId) {
-        const [dept, manager] = await Promise.all([
-            this.deptRepo.findOne({ where: { id: departmentId } }),
-            this.userRepo.findOne({ where: { id: managerId } })
-        ]);
-        if (!dept) {
-            throw new errorHandler_1.ApiError("Department not found", 404);
-        }
-        if (!manager) {
-            throw new errorHandler_1.ApiError("Manager not found", 404);
-        }
-        dept.managerId = managerId;
-        return this.deptRepo.save(dept);
-    }
-    // ==================== Utility Methods ====================
-    /**
-     * Generate URL-friendly slug from name
-     */
-    generateSlug(name) {
-        const baseSlug = name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "");
-        // Add random suffix for uniqueness
-        const suffix = Math.random().toString(36).substring(2, 6);
-        return `${baseSlug}-${suffix}`;
+    async getActivity(teamId, limit = 50) {
+        await this.teamRepo.findOneOrFail({ where: { id: teamId } });
+        return this.activityLogService.getTeamActivity(teamId, limit);
     }
 }
 exports.OrganizationService = OrganizationService;
-// Export singleton instance
-exports.organizationService = new OrganizationService();

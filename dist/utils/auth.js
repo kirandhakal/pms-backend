@@ -12,11 +12,11 @@ const JWT_SECRET = process.env.JWT_SECRET || process.env.ACCESS_TOKEN_SECRET || 
 const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || process.env.ACCESS_TOKEN_EXPIRES_IN || "24h");
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
 const hashPassword = async (password) => {
-    return await bcryptjs_1.default.hash(password, BCRYPT_SALT_ROUNDS);
+    return bcryptjs_1.default.hash(password, BCRYPT_SALT_ROUNDS);
 };
 exports.hashPassword = hashPassword;
 const comparePassword = async (password, hash) => {
-    return await bcryptjs_1.default.compare(password, hash);
+    return bcryptjs_1.default.compare(password, hash);
 };
 exports.comparePassword = comparePassword;
 const generateToken = (payload) => {
@@ -27,7 +27,7 @@ const verifyToken = (token) => {
     try {
         return jsonwebtoken_1.default.verify(token, JWT_SECRET);
     }
-    catch (err) {
+    catch {
         return null;
     }
 };

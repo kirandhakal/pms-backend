@@ -59,7 +59,7 @@ __decorate([
     __metadata("design:type", Organization_1.Organization)
 ], Invitation.prototype, "organization", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ name: "organizationid" }),
     (0, typeorm_1.Index)(),
     __metadata("design:type", String)
 ], Invitation.prototype, "organizationId", void 0);

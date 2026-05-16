@@ -51,7 +51,7 @@ class AuthService {
         const session = this.sessionRepo.create({
             user,
             token,
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
         });
         await this.sessionRepo.save(session);
         return {

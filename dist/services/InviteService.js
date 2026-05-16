@@ -49,142 +49,161 @@ class InviteService {
                 throw new Error("No organization found. Please create an organization first.");
             }
         }
-        const token = crypto_1.default.randomBytes(32).toString("hex");
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 48); // 48-hour window
-        const invite = this.inviteRepo.create({
-            email,
-            token,
-            organizationId,
-            departmentId: options.departmentId,
-            roleId: options.roleId,
-            invitedById: options.invitedById,
-            message: options.message,
-            expiresAt,
-            status: Invitation_1.InvitationStatus.PENDING,
-            type: options.departmentId ? Invitation_1.InvitationType.DEPARTMENT : Invitation_1.InvitationType.ORGANIZATION,
-        });
-        await this.inviteRepo.save(invite);
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-        const inviteUrl = `${frontendUrl}/register?token=${token}&email=${encodeURIComponent(email)}`;
-        // Send the invitation email
-        try {
-            await (0, mailer_1.sendInvitationEmail)(email, inviteUrl, legacyRole, expiresAt);
-        }
-        catch (emailErr) {
-            console.error("⚠️  Failed to send invitation email:", emailErr.message);
-            // Still return the invite URL even if email fails
-        }
-        return { inviteUrl, token };
-    }
-    /**
-     * Validate an invitation token (used during registration).
-     */
-    async validateToken(token) {
-        const invite = await this.inviteRepo.findOne({
-            where: {
+        async;
+        createInvite(email, string, role, User_1.UserRole, teamId ?  : string);
+        {
+            const token = crypto_1.default.randomBytes(32).toString("hex");
+            const expiresAt = new Date();
+            expiresAt.setHours(expiresAt.getHours() + 48); // 48-hour window
+            const invite = this.inviteRepo.create({
+                email,
                 token,
-                status: Invitation_1.InvitationStatus.PENDING
-            },
-            relations: ["organization", "department", "role"]
-        });
-        if (!invite) {
-            throw new Error("Invalid or already-used invitation token.");
-        }
-        if (invite.expiresAt < new Date()) {
-            // Mark as expired
-            invite.status = Invitation_1.InvitationStatus.EXPIRED;
+                organizationId,
+                departmentId: options.departmentId,
+                roleId: options.roleId,
+                invitedById: options.invitedById,
+                message: options.message,
+                expiresAt,
+                team: teamId ? { id: teamId } : undefined
+            });
             await this.inviteRepo.save(invite);
-            throw new Error("This invitation has expired.");
+            const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+            const inviteUrl = `${frontendUrl}/register?token=${token}&email=${encodeURIComponent(email)}`;
+            // Send the invitation email
+            try {
+                await (0, mailer_1.sendInvitationEmail)(email, inviteUrl, legacyRole, expiresAt);
+            }
+            catch (emailErr) {
+                console.error("⚠️  Failed to send invitation email:", emailErr.message);
+                // Still return the invite URL even if email fails
+            }
+            return { inviteUrl, token };
         }
-        return invite;
-    }
-    /**
-     * Mark an invitation as used (call after successful registration).
-     */
-    async markUsed(token, acceptedByUserId) {
-        const invite = await this.validateToken(token);
-        invite.status = Invitation_1.InvitationStatus.ACCEPTED;
-        invite.metadata = {
-            ...invite.metadata,
-            acceptedAt: new Date(),
-            acceptedByUserId
-        };
-        await this.inviteRepo.save(invite);
-        return invite;
-    }
-    /**
-     * Revoke an invitation
-     */
-    async revokeInvite(token) {
-        const invite = await this.inviteRepo.findOne({ where: { token } });
-        if (!invite) {
-            throw new Error("Invitation not found.");
+        /**
+         * Validate an invitation token (used during registration).
+         */
+        async;
+        validateToken(token, string);
+        {
+            const invite = await this.inviteRepo.findOne({
+                where: {
+                    token,
+                    status: Invitation_1.InvitationStatus.PENDING
+                },
+                relations: ["organization", "department", "role"]
+            });
+            if (!invite) {
+                throw new Error("Invalid or already-used invitation token.");
+            }
+            if (invite.expiresAt < new Date()) {
+                // Mark as expired
+                invite.status = Invitation_1.InvitationStatus.EXPIRED;
+                await this.inviteRepo.save(invite);
+                throw new Error("This invitation has expired.");
+            }
+            return invite;
         }
-        invite.status = Invitation_1.InvitationStatus.REVOKED;
-        await this.inviteRepo.save(invite);
-        return invite;
-    }
-    /**
-     * Resend an invitation
-     */
-    async resendInvite(token) {
-        const invite = await this.inviteRepo.findOne({
-            where: { token },
-            relations: ["role"]
+        /**
+         * Mark an invitation as used (call after successful registration).
+         */
+        async;
+        markUsed(token, string, acceptedByUserId ?  : string);
+        {
+            const invite = await this.validateToken(token);
+            invite.status = Invitation_1.InvitationStatus.ACCEPTED;
+            invite.metadata = {
+                ...invite.metadata,
+                acceptedAt: new Date(),
+                acceptedByUserId
+            };
+            await this.inviteRepo.save(invite);
+            return invite;
+        }
+        /**
+         * Revoke an invitation
+         */
+        async;
+        revokeInvite(token, string);
+        {
+            const invite = await this.inviteRepo.findOne({ where: { token } });
+            if (!invite) {
+                throw new Error("Invitation not found.");
+            }
+            invite.status = Invitation_1.InvitationStatus.REVOKED;
+            await this.inviteRepo.save(invite);
+            return invite;
+        }
+        /**
+         * Resend an invitation
+         */
+        async;
+        resendInvite(token, string);
+        {
+            const invite = await this.inviteRepo.findOne({
+                where: { token },
+                relations: ["role"]
+            });
+            if (!invite) {
+                throw new Error("Invitation not found.");
+            }
+            if (invite.status !== Invitation_1.InvitationStatus.PENDING) {
+                throw new Error("Can only resend pending invitations.");
+            }
+            // Extend expiry
+            invite.expiresAt = new Date();
+            invite.expiresAt.setHours(invite.expiresAt.getHours() + 48);
+            invite.metadata = {
+                ...invite.metadata,
+                resendCount: (invite.metadata?.resendCount || 0) + 1,
+                lastResentAt: new Date()
+            };
+            await this.inviteRepo.save(invite);
+            const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+            const inviteUrl = `${frontendUrl}/register?token=${token}&email=${encodeURIComponent(invite.email)}`;
+            // Get legacy role from Role entity or default
+            const legacyRole = User_1.UserRole.MEMBER;
+            try {
+                await (0, mailer_1.sendInvitationEmail)(invite.email, inviteUrl, legacyRole, invite.expiresAt);
+            }
+            catch (emailErr) {
+                console.error("⚠️  Failed to send invitation email:", emailErr.message);
+            }
+            return { inviteUrl, token };
+        }
+        /**
+         * List all invitations (for admin panel).
+         */
+        async;
+        listInvites(filters ?  : {
+            organizationId: string,
+            status: Invitation_1.InvitationStatus,
+            departmentId: string
         });
-        if (!invite) {
-            throw new Error("Invitation not found.");
+        {
+            const where = {};
+            if (filters?.organizationId)
+                where.organizationId = filters.organizationId;
+            if (filters?.status)
+                where.status = filters.status;
+            if (filters?.departmentId)
+                where.departmentId = filters.departmentId;
+            return this.inviteRepo.find({
+                where,
+                order: { createdAt: "DESC" },
+                relations: ["organization", "department", "role", "invitedBy"],
+            });
         }
-        if (invite.status !== Invitation_1.InvitationStatus.PENDING) {
-            throw new Error("Can only resend pending invitations.");
+        /**
+         * Get invitation by ID
+         */
+        async;
+        getInviteById(id, string);
+        {
+            return this.inviteRepo.findOne({
+                where: { id },
+                relations: ["organization", "department", "role", "invitedBy"]
+            });
         }
-        // Extend expiry
-        invite.expiresAt = new Date();
-        invite.expiresAt.setHours(invite.expiresAt.getHours() + 48);
-        invite.metadata = {
-            ...invite.metadata,
-            resendCount: (invite.metadata?.resendCount || 0) + 1,
-            lastResentAt: new Date()
-        };
-        await this.inviteRepo.save(invite);
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-        const inviteUrl = `${frontendUrl}/register?token=${token}&email=${encodeURIComponent(invite.email)}`;
-        // Get legacy role from Role entity or default
-        const legacyRole = User_1.UserRole.MEMBER;
-        try {
-            await (0, mailer_1.sendInvitationEmail)(invite.email, inviteUrl, legacyRole, invite.expiresAt);
-        }
-        catch (emailErr) {
-            console.error("⚠️  Failed to send invitation email:", emailErr.message);
-        }
-        return { inviteUrl, token };
-    }
-    /**
-     * List all invitations (for admin panel).
-     */
-    async listInvites(filters) {
-        const where = {};
-        if (filters?.organizationId)
-            where.organizationId = filters.organizationId;
-        if (filters?.status)
-            where.status = filters.status;
-        if (filters?.departmentId)
-            where.departmentId = filters.departmentId;
-        return this.inviteRepo.find({
-            where,
-            order: { createdAt: "DESC" },
-            relations: ["organization", "department", "role", "invitedBy"],
-        });
-    }
-    /**
-     * Get invitation by ID
-     */
-    async getInviteById(id) {
-        return this.inviteRepo.findOne({
-            where: { id },
-            relations: ["organization", "department", "role", "invitedBy"]
-        });
     }
 }
 exports.InviteService = InviteService;

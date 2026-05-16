@@ -4,12 +4,8 @@ import { User, UserRole } from "../entities/User";
 import { Organization } from "../entities/Organization";
 import { Role } from "../entities/Role";
 import { sendInvitationEmail } from "../utils/mailer";
-import crypto from "crypto";
-<<<<<<< HEAD
-import { Team } from "../entities/Team";
-=======
 import { Not, In } from "typeorm";
->>>>>>> new/rafc
+import crypto from "crypto";
 
 export class InviteService {
     private inviteRepo = AppDataSource.getRepository(Invitation);
@@ -60,10 +56,6 @@ export class InviteService {
             }
         }
 
-<<<<<<< HEAD
-    async createInvite(email: string, role: UserRole, teamId?: string) {
-=======
->>>>>>> new/rafc
         const token = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 48); // 48-hour window
@@ -77,12 +69,8 @@ export class InviteService {
             invitedById: options.invitedById,
             message: options.message,
             expiresAt,
-<<<<<<< HEAD
-            team: teamId ? ({ id: teamId } as Team) : undefined
-=======
             status: InvitationStatus.PENDING,
             type: options.departmentId ? InvitationType.DEPARTMENT : InvitationType.ORGANIZATION,
->>>>>>> new/rafc
         });
 
         await this.inviteRepo.save(invite);
