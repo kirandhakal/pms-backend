@@ -15,6 +15,7 @@ const Team_1 = require("./Team");
 const Project_1 = require("./Project");
 const Task_1 = require("./Task");
 const OrganizationPermission_1 = require("./OrganizationPermission");
+const ProjectPermission_1 = require("./ProjectPermission");
 var OAuthProvider;
 (function (OAuthProvider) {
     OAuthProvider["GOOGLE"] = "google";
@@ -93,6 +94,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => OrganizationPermission_1.OrganizationPermission, (permission) => permission.user),
     __metadata("design:type", Array)
 ], User.prototype, "organizationPermissions", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => ProjectPermission_1.ProjectPermission, (permission) => permission.user),
+    __metadata("design:type", Array)
+], User.prototype, "projectPermissions", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

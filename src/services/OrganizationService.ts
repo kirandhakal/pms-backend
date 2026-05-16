@@ -10,6 +10,7 @@ import { ActivityLogService } from "./ActivityLogService";
 import { CREATOR_CONTROLLED_PERMISSIONS, PermissionKey, normalizeRole } from "../constants/access";
 import { OrganizationPermission } from "../entities/OrganizationPermission";
 import { PermissionService } from "./PermissionService";
+import { EmailService } from "./EmailService";
 
 export class OrganizationService {
     private teamRepo = AppDataSource.getRepository(Team);
@@ -18,6 +19,7 @@ export class OrganizationService {
     private permissionRepo = AppDataSource.getRepository(OrganizationPermission);
     private activityLogService = new ActivityLogService();
     private permissionService = new PermissionService();
+    private emailService = new EmailService();
 
     private async ensureTeamMember(actorId: string, teamId: string) {
         const actor = await this.userRepo.findOne({
@@ -130,7 +132,7 @@ export class OrganizationService {
     }
 
     async inviteMember(actorId: string, teamId: string, email: string, role: UserRole) {
-        await this.ensureMemberManager(actorId, teamId);
+        const actor = await this.ensureMemberManager(actorId, teamId);
 
         const token = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date();
@@ -154,9 +156,25 @@ export class OrganizationService {
             details: `Invitation sent to ${email} with role ${role}`
         });
 
+        const emailResult = await this.emailService.sendInvitation({
+            email,
+            token,
+            organizationName: actor.team?.name || "Organization",
+            inviterName: actor.name,
+            role: normalizeRole(role)
+        });
+
+        if (emailResult.sent) {
+            console.log(`Invitation email sent to ${email}`);
+        } else {
+            console.warn(`Invitation created but email send failed for ${email}. Reason: ${(emailResult as { error?: string }).error || "Unknown"}`);
+        }
+
         return {
             token,
-            inviteUrl: `http://localhost:3000/register?token=${token}&email=${encodeURIComponent(email)}`
+            inviteUrl: emailResult.inviteUrl,
+            emailSent: emailResult.sent,
+            emailError: (emailResult as { error?: string }).error
         };
     }
 

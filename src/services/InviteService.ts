@@ -3,9 +3,11 @@ import { Invitation } from "../entities/Invitation";
 import { UserRole } from "../entities/User";
 import crypto from "crypto";
 import { Team } from "../entities/Team";
+import { EmailService } from "./EmailService";
 
 export class InviteService {
     private inviteRepo = AppDataSource.getRepository(Invitation);
+    private emailService = new EmailService();
 
     async createInvite(email: string, role: UserRole, teamId?: string) {
         const token = crypto.randomBytes(32).toString("hex");
@@ -22,7 +24,19 @@ export class InviteService {
 
         await this.inviteRepo.save(invite);
 
-        // In a real app, you'd send an email here.
-        return { inviteUrl: `http://localhost:3000/register?token=${token}&email=${email}`, token };
+        const emailResult = await this.emailService.sendInvitation({
+            email,
+            token,
+            organizationName: "Organization",
+            inviterName: "Team Admin",
+            role
+        });
+
+        return {
+            inviteUrl: emailResult.inviteUrl,
+            token,
+            emailSent: emailResult.sent,
+            emailError: (emailResult as { error?: string }).error
+        };
     }
 }

@@ -14,6 +14,7 @@ const typeorm_1 = require("typeorm");
 const User_1 = require("./User");
 const Team_1 = require("./Team");
 const Task_1 = require("./Task");
+const ProjectPermission_1 = require("./ProjectPermission");
 let Project = class Project {
 };
 exports.Project = Project;
@@ -41,6 +42,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => Task_1.Task, (task) => task.project),
     __metadata("design:type", Array)
 ], Project.prototype, "tasks", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => ProjectPermission_1.ProjectPermission, (permission) => permission.project),
+    __metadata("design:type", Array)
+], Project.prototype, "projectPermissions", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

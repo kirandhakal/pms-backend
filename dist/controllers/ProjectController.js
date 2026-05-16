@@ -20,11 +20,16 @@ class ProjectController {
     }
     async getAll(req, res) {
         try {
-            const projects = await projectService.getProjects();
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const projects = await projectService.getProjects(actorId);
             res.json(projects);
         }
         catch (err) {
-            res.status(500).json({ message: err.message });
+            res.status(400).json({ message: err.message });
         }
     }
     async getDashboard(req, res) {

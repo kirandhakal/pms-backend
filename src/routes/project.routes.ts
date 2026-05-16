@@ -10,6 +10,8 @@ router.use(authenticate);
 
 router.post("/", projectController.create);
 router.get("/", projectController.getAll);
+router.get("/:projectId/members/:memberId/permissions", projectController.getMemberPermissions);
+router.put("/:projectId/members/:memberId/permissions", projectController.setMemberPermissions);
 
 // Restricted Dashboard
 router.get("/dashboard", authorize([UserRole.SUDO_ADMIN, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]), projectController.getDashboard);
