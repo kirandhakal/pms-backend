@@ -5,6 +5,7 @@ import { ApiError } from "../middlewares/errorHandler";
 
 const authService = new AuthService();
 
+
 export class AuthController {
     async register(req: Request, res: Response, next: NextFunction) {
         try {
@@ -15,6 +16,7 @@ export class AuthController {
         }
     }
 
+    
     async login(req: Request, res: Response, next: NextFunction) {
         try {
             const { email, password } = req.body;
