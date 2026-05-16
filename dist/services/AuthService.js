@@ -12,6 +12,7 @@ const ActivityLogService_1 = require("./ActivityLogService");
 const access_1 = require("../constants/access");
 const PermissionService_1 = require("./PermissionService");
 const PasswordResetOtp_1 = require("../entities/PasswordResetOtp");
+const EmailService_1 = require("./EmailService");
 class AuthService {
     constructor() {
         this.userRepo = data_source_1.AppDataSource.getRepository(User_1.User);
@@ -20,6 +21,7 @@ class AuthService {
         this.otpRepo = data_source_1.AppDataSource.getRepository(PasswordResetOtp_1.PasswordResetOtp);
         this.activityLogService = new ActivityLogService_1.ActivityLogService();
         this.permissionService = new PermissionService_1.PermissionService();
+        this.emailService = new EmailService_1.EmailService();
     }
     async registerIndividual(data) {
         const { email, password, name } = data;
@@ -210,7 +212,7 @@ class AuthService {
             used: false
         });
         await this.otpRepo.save(record);
-        // Placeholder for email provider integration.
+        await this.emailService.sendOtp({ email: user.email, otp });
         return {
             message: "If this email exists, an OTP has been sent.",
             ...(process.env.NODE_ENV === "development" ? { devOtp: otp } : {})

@@ -16,6 +16,7 @@ const ActivityLogService_1 = require("./ActivityLogService");
 const access_1 = require("../constants/access");
 const OrganizationPermission_1 = require("../entities/OrganizationPermission");
 const PermissionService_1 = require("./PermissionService");
+const EmailService_1 = require("./EmailService");
 class OrganizationService {
     constructor() {
         this.teamRepo = data_source_1.AppDataSource.getRepository(Team_1.Team);
@@ -24,6 +25,7 @@ class OrganizationService {
         this.permissionRepo = data_source_1.AppDataSource.getRepository(OrganizationPermission_1.OrganizationPermission);
         this.activityLogService = new ActivityLogService_1.ActivityLogService();
         this.permissionService = new PermissionService_1.PermissionService();
+        this.emailService = new EmailService_1.EmailService();
     }
     async ensureTeamMember(actorId, teamId) {
         const actor = await this.userRepo.findOne({
@@ -114,7 +116,7 @@ class OrganizationService {
         return savedUser;
     }
     async inviteMember(actorId, teamId, email, role) {
-        await this.ensureMemberManager(actorId, teamId);
+        const actor = await this.ensureMemberManager(actorId, teamId);
         const token = crypto_1.default.randomBytes(32).toString("hex");
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 48);
@@ -133,9 +135,24 @@ class OrganizationService {
             teamId,
             details: `Invitation sent to ${email} with role ${role}`
         });
+        const emailResult = await this.emailService.sendInvitation({
+            email,
+            token,
+            organizationName: actor.team?.name || "Organization",
+            inviterName: actor.name,
+            role: (0, access_1.normalizeRole)(role)
+        });
+        if (emailResult.sent) {
+            console.log(`Invitation email sent to ${email}`);
+        }
+        else {
+            console.warn(`Invitation created but email send failed for ${email}. Reason: ${emailResult.error || "Unknown"}`);
+        }
         return {
             token,
-            inviteUrl: `http://localhost:3000/register?token=${token}&email=${encodeURIComponent(email)}`
+            inviteUrl: emailResult.inviteUrl,
+            emailSent: emailResult.sent,
+            emailError: emailResult.error
         };
     }
     async addMemberManually(actorId, teamId, name, email, role) {
