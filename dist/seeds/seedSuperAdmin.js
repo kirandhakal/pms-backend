@@ -13,9 +13,9 @@ const permissions_1 = require("../config/permissions");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const DEFAULT_SUPER_ADMIN = {
-    fullName: process.env.SUPER_ADMIN_NAME || "Super Admin",
-    email: (process.env.SUPER_ADMIN_EMAIL || "admin@taskflow.com").trim().toLowerCase(),
-    password: process.env.SUPER_ADMIN_PASSWORD || "SuperAdmin@123"
+    fullName: process.env.SUPER_ADMIN_NAME || "Sudo Admin",
+    email: (process.env.SUPER_ADMIN_EMAIL || "admin@pms.com").trim().toLowerCase(),
+    password: process.env.SUPER_ADMIN_PASSWORD || "Admin@123"
 };
 async function seedSuperAdmin() {
     console.log("🚀 Starting Super Admin seeder...\n");
