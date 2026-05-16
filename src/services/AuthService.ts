@@ -2,41 +2,11 @@ import { AppDataSource } from "../config/data-source";
 import { User, UserRole } from "../entities/User";
 import { Session } from "../entities/Session";
 import { hashPassword, comparePassword, generateToken } from "../utils/auth";
-<<<<<<< HEAD
-import { MoreThan } from "typeorm";
-import { ActivityAction } from "../entities/ActivityLog";
-import { ActivityLogService } from "./ActivityLogService";
-=======
 import { ApiError } from "../middlewares/errorHandler";
->>>>>>> new/rafc
 
 export class AuthService {
     private userRepo = AppDataSource.getRepository(User);
     private sessionRepo = AppDataSource.getRepository(Session);
-<<<<<<< HEAD
-    private inviteRepo = AppDataSource.getRepository(Invitation);
-    private activityLogService = new ActivityLogService();
-
-    async registerIndividual(data: { email: string; password: string; name: string }) {
-        const { email, password, name } = data;
-
-        const existing = await this.userRepo.findOne({ where: { email } });
-        if (existing) {
-            throw new Error("Email already registered");
-        }
-
-        const hashedPassword = await hashPassword(password);
-        const user = this.userRepo.create({
-            email,
-            name,
-            password: hashedPassword,
-            role: UserRole.TEAM_MEMBER
-        });
-
-        return this.userRepo.save(user);
-    }
-=======
->>>>>>> new/rafc
 
     async register(data: { fullName: string; email: string; password: string }) {
         const normalizedEmail = data.email.trim().toLowerCase();
@@ -45,54 +15,12 @@ export class AuthService {
             throw new ApiError("Email is already in use", 409);
         }
 
-<<<<<<< HEAD
-            const existing = await manager.findOne(User, { where: { email } });
-            if (existing) {
-                throw new Error("Email already registered");
-            }
-
-            const invitation = await manager.findOne(Invitation, {
-                where: { email, token, isUsed: false, expiresAt: MoreThan(new Date()) },
-                relations: ["team"]
-            });
-
-            if (!invitation) {
-                throw new Error("Invalid or expired invitation");
-            }
-
-            const hashedPassword = await hashPassword(password);
-            const user = manager.create(User, {
-                email,
-                name,
-                password: hashedPassword,
-                role: invitation.role,
-                team: invitation.team
-            });
-
-            const savedUser = await manager.save(user);
-
-            invitation.isUsed = true;
-            await manager.save(invitation);
-
-            if (invitation.team?.id) {
-                await this.activityLogService.log({
-                    action: ActivityAction.MEMBER_JOINED,
-                    actorId: savedUser.id,
-                    targetUserId: savedUser.id,
-                    teamId: invitation.team.id,
-                    details: `${savedUser.email} joined via invite`
-                });
-            }
-
-            return savedUser;
-=======
         const user = this.userRepo.create({
             fullName: data.fullName,
             email: normalizedEmail,
             password: await hashPassword(data.password),
             legacyRole: UserRole.USER,
             isActive: true
->>>>>>> new/rafc
         });
 
         const saved = await this.userRepo.save(user);
@@ -127,7 +55,7 @@ export class AuthService {
         const session = this.sessionRepo.create({
             user,
             token,
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
         });
 
         await this.sessionRepo.save(session);
@@ -153,37 +81,13 @@ export class AuthService {
     }
 
     async getCurrentUser(userId: string) {
-<<<<<<< HEAD
-        const user = await this.userRepo.findOne({
-            where: { id: userId },
-            relations: ["team"]
-        });
-
-        if (!user) {
-            throw new Error("User not found");
-=======
         const user = await this.userRepo.findOne({ where: { id: userId } });
         if (!user) {
             throw new ApiError("User not found", 404);
->>>>>>> new/rafc
         }
 
         return {
             id: user.id,
-<<<<<<< HEAD
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            team: user.team ? { id: user.team.id, name: user.team.name } : null
-        };
-    }
-
-    // SuperAdmin initial setup (Internal or via first user logic)
-    async createSuperAdmin(data: any) {
-        const hashedPassword = await hashPassword(data.password);
-        const user = this.userRepo.create({ ...data, password: hashedPassword, role: UserRole.SUPER_ADMIN });
-        return await this.userRepo.save(user);
-=======
             fullName: user.fullName,
             email: user.email,
             legacyRole: user.legacyRole,
@@ -312,6 +216,5 @@ export class AuthService {
             createdAt: saved.createdAt,
             updatedAt: saved.updatedAt
         };
->>>>>>> new/rafc
     }
 }

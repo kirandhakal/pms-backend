@@ -2,30 +2,20 @@ import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../utils/auth";
 import { AppDataSource } from "../config/data-source";
 import { Session } from "../entities/Session";
-import { UserRole, User } from "../entities/User";
-import { Role } from "../entities/Role";
+import { UserRole } from "../entities/User";
 
 declare global {
     namespace Express {
         interface User {
             id?: string;
             role?: UserRole;
+            legacyRole?: UserRole;
         }
     }
 }
 
 export interface AuthRequest extends Request {
-<<<<<<< HEAD
     user?: Express.User;
-=======
-    user?: {
-        id: string;
-        role?: Role;
-        legacyRole: UserRole;
-        organizationId?: string;
-        departmentId?: string;
-    };
->>>>>>> new/rafc
 }
 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -43,11 +33,10 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         return;
     }
 
-    // Dual-layer: Session check
     const sessionRepo = AppDataSource.getRepository(Session);
     const session = await sessionRepo.findOne({
         where: { token, isActive: true },
-        relations: ["user", "user.role", "user.role.permissions"]
+        relations: ["user"]
     });
 
     if (!session) {
@@ -56,15 +45,14 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     if (!session.user || !session.user.isActive || session.expiresAt <= new Date()) {
-        return res.status(401).json({ message: "Session expired or user inactive" });
+        res.status(401).json({ message: "Session expired or user inactive" });
+        return;
     }
 
     req.user = {
         id: session.user.id,
-        role: session.user.role,
-        legacyRole: session.user.legacyRole,
-        organizationId: session.user.organizationId,
-        departmentId: session.user.departmentId
+        role: session.user.legacyRole,
+        legacyRole: session.user.legacyRole
     };
 
     next();
@@ -72,15 +60,12 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
 export const authorizeRoles = (...roles: UserRole[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
-<<<<<<< HEAD
-        if (!req.user?.role || !roles.includes(req.user.role)) {
+        const role = req.user?.role ?? req.user?.legacyRole;
+        if (!req.user || !role || !roles.includes(role)) {
             res.status(403).json({ message: "Forbidden: Insufficient permissions" });
             return;
-=======
-        if (!req.user || !roles.includes(req.user.legacyRole)) {
-            return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
->>>>>>> new/rafc
         }
+
         next();
     };
 };
