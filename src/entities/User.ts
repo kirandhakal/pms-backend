@@ -5,6 +5,12 @@ import { Role } from "./Role";
 import { Project } from "./Project";
 import { Task } from "./Task";
 
+export enum OAuthProvider {
+    GOOGLE = "google",
+    GITHUB = "github",
+    LOCAL = "local"
+}
+
 /**
  * Legacy UserRole enum - kept for backwards compatibility
  * New system uses Role entity with dynamic permissions
@@ -38,6 +44,12 @@ export class User {
 
     @Column({ select: false, nullable: true })
     password!: string;
+
+    @Column({ type: "enum", enum: OAuthProvider, default: OAuthProvider.LOCAL })
+    oauthProvider!: OAuthProvider;
+
+    @Column({ nullable: true })
+    oauthId?: string;
 
     // Legacy role enum - kept for backwards compatibility
     @Column({
@@ -76,6 +88,9 @@ export class User {
 
     @Column({ default: true })
     isActive!: boolean;
+
+    @Column({ nullable: true })
+    phone?: string;
 
     @Column({ type: "timestamp", nullable: true })
     lastLoginAt?: Date;

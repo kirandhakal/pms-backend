@@ -23,7 +23,7 @@ export const configureGitHubStrategy = () => {
 
                     if (user) {
                         // User exists, generate token
-                        const token = generateToken({ id: user.id, role: user.role });
+                        const token = generateToken({ id: user.id, role: user.legacyRole });
                         return done(null, { user, token });
                     }
 
@@ -40,22 +40,22 @@ export const configureGitHubStrategy = () => {
                             existingUser.oauthProvider = OAuthProvider.GITHUB;
                             existingUser.oauthId = profile.id;
                             user = await userRepo.save(existingUser);
-                            const token = generateToken({ id: user.id, role: user.role });
+                            const token = generateToken({ id: user.id, role: user.legacyRole });
                             return done(null, { user, token });
                         }
                     }
 
                     // Create new user
                     user = userRepo.create({
-                        name: profile.displayName || profile.username || "Unknown",
+                        fullName: profile.displayName || profile.username || "Unknown",
                         email: email || `${profile.id}@github.local`,
                         oauthProvider: OAuthProvider.GITHUB,
                         oauthId: profile.id,
-                        role: UserRole.TEAM_MEMBER
+                        legacyRole: UserRole.TEAM_MEMBER
                     });
 
                     user = await userRepo.save(user);
-                    const token = generateToken({ id: user.id, role: user.role });
+                    const token = generateToken({ id: user.id, role: user.legacyRole });
 
                     return done(null, { user, token });
                 } catch (error) {

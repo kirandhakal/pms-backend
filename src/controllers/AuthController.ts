@@ -52,7 +52,8 @@ export class AuthController {
             if (!req.user) {
                 throw new ApiError("Unauthorized", 401);
             }
-            const user = await authService.getCurrentUser(req.user.id);
+            const userId = req.user.id;
+            const user = await authService.getCurrentUser(userId);
             res.json(user);
         } catch (err: any) {
             next(err);
@@ -64,7 +65,8 @@ export class AuthController {
             if (!req.user) {
                 throw new ApiError("Unauthorized", 401);
             }
-            const user = await authService.updateProfile(req.user.id, req.body);
+            const userId = req.user.id;
+            const user = await authService.updateProfile(userId, req.body);
             res.json(user);
         } catch (err: any) {
             next(err);
@@ -77,8 +79,9 @@ export class AuthController {
                 throw new ApiError("Unauthorized", 401);
             }
 
+            const userId = req.user.id;
             const result = await authService.changePassword(
-                req.user.id,
+                userId,
                 req.body.currentPassword,
                 req.body.newPassword
             );

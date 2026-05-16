@@ -23,7 +23,7 @@ export const configureGoogleStrategy = () => {
 
                     if (user) {
                         // User exists, generate token
-                        const token = generateToken({ id: user.id, role: user.role });
+                        const token = generateToken({ id: user.id, role: user.legacyRole });
                         return done(null, { user, token });
                     }
 
@@ -37,21 +37,21 @@ export const configureGoogleStrategy = () => {
                         existingUser.oauthProvider = OAuthProvider.GOOGLE;
                         existingUser.oauthId = profile.id;
                         user = await userRepo.save(existingUser);
-                        const token = generateToken({ id: user.id, role: user.role });
+                        const token = generateToken({ id: user.id, role: user.legacyRole });
                         return done(null, { user, token });
                     }
 
                     // Create new user
                     user = userRepo.create({
-                        name: profile.displayName || profile.name?.givenName + " " + profile.name?.familyName || "Unknown",
+                        fullName: profile.displayName || profile.name?.givenName + " " + profile.name?.familyName || "Unknown",
                         email: profile.emails?.[0].value || "",
                         oauthProvider: OAuthProvider.GOOGLE,
                         oauthId: profile.id,
-                        role: UserRole.TEAM_MEMBER
+                        legacyRole: UserRole.TEAM_MEMBER
                     });
 
                     user = await userRepo.save(user);
-                    const token = generateToken({ id: user.id, role: user.role });
+                    const token = generateToken({ id: user.id, role: user.legacyRole });
 
                     return done(null, { user, token });
                 } catch (error) {

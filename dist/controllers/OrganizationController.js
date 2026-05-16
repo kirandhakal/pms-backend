@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrganizationController = void 0;
-const OrganizationService_1 = require("../services/OrganizationService");
-const organizationService = new OrganizationService_1.OrganizationService();
+const OrganizationServiceClean_1 = require("../services/OrganizationServiceClean");
+const organizationService = new OrganizationServiceClean_1.OrganizationService();
 class OrganizationController {
     async create(req, res) {
         try {
@@ -128,6 +128,39 @@ class OrganizationController {
         }
         catch (err) {
             res.status(404).json({ message: err.message });
+        }
+    }
+    async getMemberPermissions(req, res) {
+        try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const teamId = String(req.params.teamId);
+            const memberId = String(req.params.memberId);
+            const result = await organizationService.getMemberPermissions(actorId, teamId, memberId);
+            res.json(result);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
+    async setMemberPermissions(req, res) {
+        try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const teamId = String(req.params.teamId);
+            const memberId = String(req.params.memberId);
+            const permissionValues = Array.isArray(req.body?.permissions) ? req.body.permissions : [];
+            const result = await organizationService.setMemberPermissions(actorId, teamId, memberId, permissionValues);
+            res.json(result);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
         }
     }
 }

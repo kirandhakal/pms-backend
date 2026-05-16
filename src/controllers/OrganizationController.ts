@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "../middlewares/auth";
-import { OrganizationService } from "../services/OrganizationService";
+import { OrganizationService } from "../services/OrganizationServiceClean";
 import { UserRole } from "../entities/User";
 
 const organizationService = new OrganizationService();
@@ -137,6 +137,41 @@ export class OrganizationController {
             res.json(result);
         } catch (err: any) {
             res.status(404).json({ message: err.message });
+        }
+    }
+
+    async getMemberPermissions(req: AuthRequest, res: Response) {
+        try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+
+            const teamId = String(req.params.teamId);
+            const memberId = String(req.params.memberId);
+            const result = await organizationService.getMemberPermissions(actorId, teamId, memberId);
+            res.json(result);
+        } catch (err: any) {
+            res.status(400).json({ message: err.message });
+        }
+    }
+
+    async setMemberPermissions(req: AuthRequest, res: Response) {
+        try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+
+            const teamId = String(req.params.teamId);
+            const memberId = String(req.params.memberId);
+            const permissionValues = Array.isArray(req.body?.permissions) ? req.body.permissions : [];
+            const result = await organizationService.setMemberPermissions(actorId, teamId, memberId, permissionValues);
+            res.json(result);
+        } catch (err: any) {
+            res.status(400).json({ message: err.message });
         }
     }
 }

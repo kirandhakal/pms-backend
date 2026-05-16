@@ -4,6 +4,7 @@ import { User } from "./User";
 import { Workflow } from "./Workflow";
 import { WorkflowStage } from "./WorkflowStage";
 import { Department } from "./Department";
+import { Team } from "./Team";
 
 export enum TaskStatus {
     TODO = "Todo",
@@ -99,6 +100,13 @@ export class Task {
     @Index()
     departmentId?: string;
 
+    @ManyToOne(() => Team, { nullable: true })
+    @JoinColumn({ name: "teamId" })
+    team?: Team;
+
+    @Column({ nullable: true })
+    teamId?: string;
+
     // User assignments
     @ManyToOne(() => User, (user) => user.assignedTasks, { nullable: true })
     @JoinColumn({ name: "assigneeId" })
@@ -112,8 +120,15 @@ export class Task {
     @JoinColumn({ name: "createdById" })
     createdBy?: User;
 
+    @ManyToOne(() => User, { nullable: true })
+    @JoinColumn({ name: "ownerId" })
+    owner?: User;
+
     @Column({ nullable: true })
     createdById?: string;
+
+    @Column({ nullable: true })
+    ownerId?: string;
 
     // Dates
     @Column({ type: "timestamp", nullable: true })

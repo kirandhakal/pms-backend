@@ -10,14 +10,7 @@ const task_routes_1 = __importDefault(require("./task.routes"));
 const invite_routes_1 = __importDefault(require("./invite.routes"));
 const organization_routes_1 = __importDefault(require("./organization.routes"));
 const router = (0, express_1.Router)();
-// Public routes (no auth required)
-router.use("/public", publicRoutes);
-// Authentication routes
 router.use("/auth", auth_routes_1.default);
-// Protected routes
-router.use("/organizations", organization_routes_1.default);
-router.use("/workflows", workflowRoutes);
-router.use("/roles", roleRoutes);
 router.use("/projects", project_routes_1.default);
 router.use("/tasks", task_routes_1.default);
 router.use("/invites", invite_routes_1.default);

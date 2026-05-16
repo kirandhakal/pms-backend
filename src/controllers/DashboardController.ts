@@ -3,6 +3,7 @@ import { AuthRequest } from "../middlewares/auth";
 import { DashboardService } from "../services/DashboardService";
 import { ApiError } from "../middlewares/errorHandler";
 import { RoleLevel } from "../config/permissions";
+import { UserRole } from "../entities/User";
 
 const dashboardService = new DashboardService();
 
@@ -14,7 +15,7 @@ export class DashboardController {
                 throw new ApiError("Unauthorized", 401);
             }
 
-            const roleLevel = req.user.role?.level ?? RoleLevel.MEMBER;
+            const roleLevel = req.user.role?.level ?? this.mapLegacyRoleToLevel(req.user.legacyRole);
             let data;
 
             if (roleLevel <= RoleLevel.SUDO_ADMIN) {
@@ -208,6 +209,25 @@ export class DashboardController {
             res.json(data);
         } catch (err) {
             next(err);
+        }
+    }
+
+    private mapLegacyRoleToLevel(role?: UserRole): RoleLevel {
+        switch (role) {
+            case UserRole.SUDO_ADMIN:
+                return RoleLevel.SUDO_ADMIN;
+            case UserRole.SUPER_ADMIN:
+                return RoleLevel.SUPER_ADMIN;
+            case UserRole.ADMIN:
+                return RoleLevel.ADMIN;
+            case UserRole.DEPARTMENT_HEAD:
+                return RoleLevel.DEPARTMENT_HEAD;
+            case UserRole.MANAGER:
+                return RoleLevel.MANAGER;
+            case UserRole.MEMBER:
+                return RoleLevel.MEMBER;
+            default:
+                return RoleLevel.GUEST;
         }
     }
 }
