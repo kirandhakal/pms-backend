@@ -4,6 +4,7 @@ exports.DashboardController = void 0;
 const DashboardService_1 = require("../services/DashboardService");
 const errorHandler_1 = require("../middlewares/errorHandler");
 const permissions_1 = require("../config/permissions");
+const User_1 = require("../entities/User");
 const dashboardService = new DashboardService_1.DashboardService();
 class DashboardController {
     // Generic dashboard - returns role-appropriate data
@@ -12,7 +13,7 @@ class DashboardController {
             if (!req.user) {
                 throw new errorHandler_1.ApiError("Unauthorized", 401);
             }
-            const roleLevel = req.user.role?.level ?? permissions_1.RoleLevel.MEMBER;
+            const roleLevel = req.user.role?.level ?? this.mapLegacyRoleToLevel(req.user.legacyRole);
             let data;
             if (roleLevel <= permissions_1.RoleLevel.SUDO_ADMIN) {
                 data = await dashboardService.getSudoDashboard();
@@ -198,6 +199,24 @@ class DashboardController {
         }
         catch (err) {
             next(err);
+        }
+    }
+    mapLegacyRoleToLevel(role) {
+        switch (role) {
+            case User_1.UserRole.SUDO_ADMIN:
+                return permissions_1.RoleLevel.SUDO_ADMIN;
+            case User_1.UserRole.SUPER_ADMIN:
+                return permissions_1.RoleLevel.SUPER_ADMIN;
+            case User_1.UserRole.ADMIN:
+                return permissions_1.RoleLevel.ADMIN;
+            case User_1.UserRole.DEPARTMENT_HEAD:
+                return permissions_1.RoleLevel.DEPARTMENT_HEAD;
+            case User_1.UserRole.MANAGER:
+                return permissions_1.RoleLevel.MANAGER;
+            case User_1.UserRole.MEMBER:
+                return permissions_1.RoleLevel.MEMBER;
+            default:
+                return permissions_1.RoleLevel.GUEST;
         }
     }
 }

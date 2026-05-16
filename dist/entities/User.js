@@ -9,13 +9,19 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.User = exports.UserRole = void 0;
+exports.User = exports.UserRole = exports.OAuthProvider = void 0;
 const typeorm_1 = require("typeorm");
 const Organization_1 = require("./Organization");
 const Department_1 = require("./Department");
 const Role_1 = require("./Role");
 const Project_1 = require("./Project");
 const Task_1 = require("./Task");
+var OAuthProvider;
+(function (OAuthProvider) {
+    OAuthProvider["GOOGLE"] = "google";
+    OAuthProvider["GITHUB"] = "github";
+    OAuthProvider["LOCAL"] = "local";
+})(OAuthProvider || (exports.OAuthProvider = OAuthProvider = {}));
 /**
  * Legacy UserRole enum - kept for backwards compatibility
  * New system uses Role entity with dynamic permissions
@@ -55,6 +61,14 @@ __decorate([
     (0, typeorm_1.Column)({ select: false, nullable: true }),
     __metadata("design:type", String)
 ], User.prototype, "password", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "enum", enum: OAuthProvider, default: OAuthProvider.LOCAL }),
+    __metadata("design:type", String)
+], User.prototype, "oauthProvider", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], User.prototype, "oauthId", void 0);
 __decorate([
     (0, typeorm_1.Column)({
         type: "enum",
@@ -97,6 +111,10 @@ __decorate([
     (0, typeorm_1.Column)({ default: true }),
     __metadata("design:type", Boolean)
 ], User.prototype, "isActive", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], User.prototype, "phone", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "timestamp", nullable: true }),
     __metadata("design:type", Date)

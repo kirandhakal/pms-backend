@@ -155,11 +155,15 @@ const requireRoleLevel = (maxLevel) => {
             };
         }
         // Lower level number = higher privilege
-        if (req.userContext.roleLevel > maxLevel) {
+        const userContext = req.userContext;
+        if (!userContext) {
+            return res.status(500).json({ message: "Failed to load permissions" });
+        }
+        if (userContext.roleLevel > maxLevel) {
             return res.status(403).json({
                 message: "Insufficient role level",
                 required: maxLevel,
-                current: req.userContext.roleLevel
+                current: userContext.roleLevel
             });
         }
         next();
@@ -192,10 +196,14 @@ const requireOrganization = (orgIdParam = "organizationId") => {
             };
         }
         // System/Super admins can access any organization
-        if (req.userContext.roleLevel <= permissions_1.RoleLevel.SUPER_ADMIN) {
+        const userContext = req.userContext;
+        if (!userContext) {
+            return res.status(500).json({ message: "Failed to load permissions" });
+        }
+        if (userContext.roleLevel <= permissions_1.RoleLevel.SUPER_ADMIN) {
             return next();
         }
-        if (req.userContext.organizationId !== targetOrgId) {
+        if (userContext.organizationId !== targetOrgId) {
             return res.status(403).json({ message: "Access denied to this organization" });
         }
         next();
@@ -229,10 +237,14 @@ const requireDepartment = (deptIdParam = "departmentId") => {
             };
         }
         // Admins+ can access any department in their org
-        if (req.userContext.roleLevel <= permissions_1.RoleLevel.ADMIN) {
+        const userContext = req.userContext;
+        if (!userContext) {
+            return res.status(500).json({ message: "Failed to load permissions" });
+        }
+        if (userContext.roleLevel <= permissions_1.RoleLevel.ADMIN) {
             return next();
         }
-        if (req.userContext.departmentId !== targetDeptId) {
+        if (userContext.departmentId !== targetDeptId) {
             return res.status(403).json({ message: "Access denied to this department" });
         }
         next();

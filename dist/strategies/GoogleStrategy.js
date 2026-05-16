@@ -23,7 +23,7 @@ const configureGoogleStrategy = () => {
             });
             if (user) {
                 // User exists, generate token
-                const token = (0, auth_1.generateToken)({ id: user.id, role: user.role });
+                const token = (0, auth_1.generateToken)({ id: user.id, role: user.legacyRole });
                 return done(null, { user, token });
             }
             // Check if user exists with same email (local account)
@@ -35,19 +35,19 @@ const configureGoogleStrategy = () => {
                 existingUser.oauthProvider = User_1.OAuthProvider.GOOGLE;
                 existingUser.oauthId = profile.id;
                 user = await userRepo.save(existingUser);
-                const token = (0, auth_1.generateToken)({ id: user.id, role: user.role });
+                const token = (0, auth_1.generateToken)({ id: user.id, role: user.legacyRole });
                 return done(null, { user, token });
             }
             // Create new user
             user = userRepo.create({
-                name: profile.displayName || profile.name?.givenName + " " + profile.name?.familyName || "Unknown",
+                fullName: profile.displayName || profile.name?.givenName + " " + profile.name?.familyName || "Unknown",
                 email: profile.emails?.[0].value || "",
                 oauthProvider: User_1.OAuthProvider.GOOGLE,
                 oauthId: profile.id,
-                role: User_1.UserRole.TEAM_MEMBER
+                legacyRole: User_1.UserRole.TEAM_MEMBER
             });
             user = await userRepo.save(user);
-            const token = (0, auth_1.generateToken)({ id: user.id, role: user.role });
+            const token = (0, auth_1.generateToken)({ id: user.id, role: user.legacyRole });
             return done(null, { user, token });
         }
         catch (error) {

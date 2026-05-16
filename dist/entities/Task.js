@@ -16,6 +16,7 @@ const User_1 = require("./User");
 const Workflow_1 = require("./Workflow");
 const WorkflowStage_1 = require("./WorkflowStage");
 const Department_1 = require("./Department");
+const Team_1 = require("./Team");
 var TaskStatus;
 (function (TaskStatus) {
     TaskStatus["TODO"] = "Todo";
@@ -105,6 +106,15 @@ __decorate([
     __metadata("design:type", String)
 ], Task.prototype, "departmentId", void 0);
 __decorate([
+    (0, typeorm_1.ManyToOne)(() => Team_1.Team, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "teamId" }),
+    __metadata("design:type", Team_1.Team)
+], Task.prototype, "team", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Task.prototype, "teamId", void 0);
+__decorate([
     (0, typeorm_1.ManyToOne)(() => User_1.User, (user) => user.assignedTasks, { nullable: true }),
     (0, typeorm_1.JoinColumn)({ name: "assigneeId" }),
     __metadata("design:type", User_1.User)
@@ -120,9 +130,18 @@ __decorate([
     __metadata("design:type", User_1.User)
 ], Task.prototype, "createdBy", void 0);
 __decorate([
+    (0, typeorm_1.ManyToOne)(() => User_1.User, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "ownerId" }),
+    __metadata("design:type", User_1.User)
+], Task.prototype, "owner", void 0);
+__decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Task.prototype, "createdById", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Task.prototype, "ownerId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "timestamp", nullable: true }),
     __metadata("design:type", Date)
