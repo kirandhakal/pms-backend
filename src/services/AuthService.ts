@@ -39,6 +39,7 @@ export class AuthService {
         const normalizedEmail = email.trim().toLowerCase();
         const user = await this.userRepo.findOne({
             where: { email: normalizedEmail },
+            relations: ["team"],
             select: ["id", "password", "legacyRole", "fullName", "email", "isActive"]
         });
 
@@ -67,6 +68,7 @@ export class AuthService {
                 fullName: user.fullName,
                 email: user.email,
                 legacyRole: user.legacyRole,
+                team: user.team ? { id: user.team.id, name: user.team.name } : undefined,
                 isActive: user.isActive
             }
         };
@@ -81,7 +83,7 @@ export class AuthService {
     }
 
     async getCurrentUser(userId: string) {
-        const user = await this.userRepo.findOne({ where: { id: userId } });
+        const user = await this.userRepo.findOne({ where: { id: userId }, relations: ["team"] });
         if (!user) {
             throw new ApiError("User not found", 404);
         }
@@ -91,6 +93,7 @@ export class AuthService {
             fullName: user.fullName,
             email: user.email,
             legacyRole: user.legacyRole,
+            team: user.team ? { id: user.team.id, name: user.team.name } : undefined,
             isActive: user.isActive,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt
