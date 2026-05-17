@@ -13,6 +13,7 @@ import { Permission } from "../entities/Permission";
 import { Workflow } from "../entities/Workflow";
 import { WorkflowStage } from "../entities/WorkflowStage";
 import { AuditLog } from "../entities/AuditLog";
+import { ActivityLog } from "../entities/ActivityLog";
 import { TaskActivity } from "../entities/TaskActivity";
 import { TaskComment } from "../entities/TaskComment";
 import dotenv from "dotenv";
@@ -56,6 +57,7 @@ export const AppDataSource = new DataSource({
         Workflow,
         WorkflowStage,
         AuditLog,
+        ActivityLog,
         TaskActivity,
         TaskComment
     ],
