@@ -19,6 +19,7 @@ const Permission_1 = require("../entities/Permission");
 const Workflow_1 = require("../entities/Workflow");
 const WorkflowStage_1 = require("../entities/WorkflowStage");
 const AuditLog_1 = require("../entities/AuditLog");
+const ActivityLog_1 = require("../entities/ActivityLog");
 const TaskActivity_1 = require("../entities/TaskActivity");
 const TaskComment_1 = require("../entities/TaskComment");
 const dotenv_1 = __importDefault(require("dotenv"));
@@ -57,6 +58,7 @@ exports.AppDataSource = new typeorm_1.DataSource({
         Workflow_1.Workflow,
         WorkflowStage_1.WorkflowStage,
         AuditLog_1.AuditLog,
+        ActivityLog_1.ActivityLog,
         TaskActivity_1.TaskActivity,
         TaskComment_1.TaskComment
     ],

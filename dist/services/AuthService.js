@@ -39,6 +39,7 @@ class AuthService {
         const normalizedEmail = email.trim().toLowerCase();
         const user = await this.userRepo.findOne({
             where: { email: normalizedEmail },
+            relations: ["team"],
             select: ["id", "password", "legacyRole", "fullName", "email", "isActive"]
         });
         if (!user || !(await (0, auth_1.comparePassword)(password, user.password))) {
@@ -61,6 +62,7 @@ class AuthService {
                 fullName: user.fullName,
                 email: user.email,
                 legacyRole: user.legacyRole,
+                team: user.team ? { id: user.team.id, name: user.team.name } : undefined,
                 isActive: user.isActive
             }
         };
@@ -73,7 +75,7 @@ class AuthService {
         }
     }
     async getCurrentUser(userId) {
-        const user = await this.userRepo.findOne({ where: { id: userId } });
+        const user = await this.userRepo.findOne({ where: { id: userId }, relations: ["team"] });
         if (!user) {
             throw new errorHandler_1.ApiError("User not found", 404);
         }
@@ -82,6 +84,7 @@ class AuthService {
             fullName: user.fullName,
             email: user.email,
             legacyRole: user.legacyRole,
+            team: user.team ? { id: user.team.id, name: user.team.name } : undefined,
             isActive: user.isActive,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt
