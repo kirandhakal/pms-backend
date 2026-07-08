@@ -17,9 +17,20 @@ class AuthService {
         if (existing) {
             throw new errorHandler_1.ApiError("Email is already in use", 409);
         }
+        // Generate username if not provided
+        let username = data.username?.trim().toLowerCase();
+        if (!username) {
+            username = normalizedEmail.split("@")[0] + Math.floor(Math.random() * 1000);
+        }
+        // Check username uniqueness
+        const existingUsername = await this.userRepo.findOne({ where: { username } });
+        if (existingUsername) {
+            throw new errorHandler_1.ApiError("Username is already taken", 409);
+        }
         const user = this.userRepo.create({
             fullName: data.fullName,
             email: normalizedEmail,
+            username,
             password: await (0, auth_1.hashPassword)(data.password),
             legacyRole: User_1.UserRole.USER,
             isActive: true
@@ -28,6 +39,7 @@ class AuthService {
         return {
             id: saved.id,
             fullName: saved.fullName,
+            username: saved.username,
             email: saved.email,
             legacyRole: saved.legacyRole,
             isActive: saved.isActive,
@@ -40,7 +52,7 @@ class AuthService {
         const user = await this.userRepo.findOne({
             where: { email: normalizedEmail },
             relations: ["team"],
-            select: ["id", "password", "legacyRole", "fullName", "email", "isActive"]
+            select: ["id", "password", "legacyRole", "fullName", "username", "email", "avatarUrl", "organizationId", "isActive"]
         });
         if (!user || !(await (0, auth_1.comparePassword)(password, user.password))) {
             throw new errorHandler_1.ApiError("Invalid credentials", 401);
@@ -60,8 +72,11 @@ class AuthService {
             user: {
                 id: user.id,
                 fullName: user.fullName,
+                username: user.username,
                 email: user.email,
                 legacyRole: user.legacyRole,
+                avatarUrl: user.avatarUrl,
+                organizationId: user.organizationId,
                 team: user.team ? { id: user.team.id, name: user.team.name } : undefined,
                 isActive: user.isActive
             }
@@ -75,15 +90,28 @@ class AuthService {
         }
     }
     async getCurrentUser(userId) {
-        const user = await this.userRepo.findOne({ where: { id: userId }, relations: ["team"] });
+        const user = await this.userRepo.findOne({
+            where: { id: userId },
+            relations: ["team", "userOrganizations", "userOrganizations.organization"]
+        });
         if (!user) {
             throw new errorHandler_1.ApiError("User not found", 404);
         }
+        const organizations = (user.userOrganizations ?? []).map((membership) => ({
+            id: membership.organization?.id ?? membership.organizationId,
+            name: membership.organization?.name ?? "",
+            slug: membership.organization?.slug ?? "",
+            role: membership.role
+        }));
         return {
             id: user.id,
             fullName: user.fullName,
+            username: user.username,
             email: user.email,
             legacyRole: user.legacyRole,
+            avatarUrl: user.avatarUrl,
+            organizationId: user.organizationId,
+            organizations,
             team: user.team ? { id: user.team.id, name: user.team.name } : undefined,
             isActive: user.isActive,
             createdAt: user.createdAt,

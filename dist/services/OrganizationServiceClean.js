@@ -17,6 +17,8 @@ const access_1 = require("../constants/access");
 const OrganizationPermission_1 = require("../entities/OrganizationPermission");
 const PermissionService_1 = require("./PermissionService");
 const Role_1 = require("../entities/Role");
+const Organization_1 = require("../entities/Organization");
+const UserOrganization_1 = require("../entities/UserOrganization");
 class OrganizationService {
     constructor() {
         this.teamRepo = data_source_1.AppDataSource.getRepository(Team_1.Team);
@@ -26,6 +28,8 @@ class OrganizationService {
         this.activityLogService = new ActivityLogService_1.ActivityLogService();
         this.permissionService = new PermissionService_1.PermissionService();
         this.roleRepo = data_source_1.AppDataSource.getRepository(Role_1.Role);
+        this.organizationRepo = data_source_1.AppDataSource.getRepository(Organization_1.Organization);
+        this.userOrganizationRepo = data_source_1.AppDataSource.getRepository(UserOrganization_1.UserOrganization);
     }
     async ensureTeamMember(actorId, teamId) {
         const actor = await this.userRepo.findOne({ where: { id: actorId }, relations: ["team"] });
@@ -59,7 +63,32 @@ class OrganizationService {
         const savedTeam = await this.teamRepo.save(team);
         actor.team = savedTeam;
         actor.legacyRole = User_1.UserRole.SUPER_ADMIN;
+        actor.organizationId = savedTeam.id;
         await this.userRepo.save(actor);
+        const organizationExists = await this.organizationRepo.findOne({ where: { id: savedTeam.id } });
+        if (!organizationExists) {
+            const orgSlug = name
+                .toLowerCase()
+                .trim()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)/g, "") || `org-${savedTeam.id.slice(0, 8)}`;
+            await this.organizationRepo.save(this.organizationRepo.create({
+                id: savedTeam.id,
+                name,
+                slug: `${orgSlug}-${savedTeam.id.slice(0, 4)}`,
+                ownerId: actor.id
+            }));
+        }
+        const existingMembership = await this.userOrganizationRepo.findOne({
+            where: { userId: actor.id, organizationId: savedTeam.id }
+        });
+        if (!existingMembership) {
+            await this.userOrganizationRepo.save(this.userOrganizationRepo.create({
+                userId: actor.id,
+                organizationId: savedTeam.id,
+                role: UserOrganization_1.OrgMemberRole.OWNER
+            }));
+        }
         await this.activityLogService.log({
             action: ActivityLog_1.ActivityAction.ORGANIZATION_CREATED,
             actorId,
@@ -81,10 +110,21 @@ class OrganizationService {
         if (!team)
             throw new Error("Organization not found");
         user.team = team;
+        user.organizationId = team.id;
         if (user.legacyRole !== User_1.UserRole.SUPER_ADMIN && user.legacyRole !== User_1.UserRole.SUDO_ADMIN) {
             user.legacyRole = User_1.UserRole.MEMBER;
         }
         const savedUser = await this.userRepo.save(user);
+        const existingMembership = await this.userOrganizationRepo.findOne({
+            where: { userId: user.id, organizationId: team.id }
+        });
+        if (!existingMembership) {
+            await this.userOrganizationRepo.save(this.userOrganizationRepo.create({
+                userId: user.id,
+                organizationId: team.id,
+                role: UserOrganization_1.OrgMemberRole.MEMBER
+            }));
+        }
         await this.activityLogService.log({
             action: ActivityLog_1.ActivityAction.MEMBER_JOINED,
             actorId,
@@ -126,13 +166,24 @@ class OrganizationService {
             existingUser.fullName = name || existingUser.fullName;
             existingUser.legacyRole = role;
             existingUser.team = team;
+            existingUser.organizationId = team.id;
             savedUser = await this.userRepo.save(existingUser);
         }
         else {
             const tempPassword = crypto_1.default.randomBytes(8).toString("hex");
             const hashedPassword = await (0, auth_1.hashPassword)(tempPassword);
-            const createdUser = this.userRepo.create({ fullName: name, email, password: hashedPassword, legacyRole: role, team });
+            const createdUser = this.userRepo.create({ fullName: name, email, password: hashedPassword, legacyRole: role, team, organizationId: team.id });
             savedUser = await this.userRepo.save(createdUser);
+        }
+        const existingMembership = await this.userOrganizationRepo.findOne({
+            where: { userId: savedUser.id, organizationId: team.id }
+        });
+        if (!existingMembership) {
+            await this.userOrganizationRepo.save(this.userOrganizationRepo.create({
+                userId: savedUser.id,
+                organizationId: team.id,
+                role: role === User_1.UserRole.SUPER_ADMIN || role === User_1.UserRole.SUDO_ADMIN ? UserOrganization_1.OrgMemberRole.ADMIN : UserOrganization_1.OrgMemberRole.MEMBER
+            }));
         }
         await this.activityLogService.log({ action: ActivityLog_1.ActivityAction.MEMBER_ADDED, actorId, targetUserId: savedUser.id, teamId, details: `${savedUser.email} added manually with role ${role}` });
         return savedUser;
@@ -153,9 +204,11 @@ class OrganizationService {
         if (!member || member.team?.id !== teamId)
             throw new Error("Member not found in organization");
         member.team = undefined;
+        member.organizationId = undefined;
         if (member.legacyRole !== User_1.UserRole.SUDO_ADMIN)
             member.legacyRole = User_1.UserRole.MEMBER;
         const saved = await this.userRepo.save(member);
+        await this.userOrganizationRepo.delete({ userId: memberId, organizationId: teamId });
         await this.activityLogService.log({ action: ActivityLog_1.ActivityAction.MEMBER_REMOVED, actorId, targetUserId: memberId, teamId, details: `${saved.email} removed from organization` });
         return { id: saved.id, email: saved.email };
     }

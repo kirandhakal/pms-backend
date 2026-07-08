@@ -4,6 +4,7 @@ import { Department } from "./Department";
 import { Role } from "./Role";
 import { Project } from "./Project";
 import { Task } from "./Task";
+import { UserOrganization } from "./UserOrganization";
 
 export enum OAuthProvider {
     GOOGLE = "google",
@@ -37,6 +38,10 @@ export class User {
 
     @Column({ name: "name" })
     fullName!: string;
+
+    @Column({ unique: true, nullable: true })
+    @Index()
+    username?: string;
 
     @Column({ unique: true })
     @Index()
@@ -114,6 +119,9 @@ export class User {
 
     @OneToMany(() => Task, (task) => task.assignedUser)
     assignedTasks?: Task[];
+
+    @OneToMany(() => UserOrganization, (userOrganization) => userOrganization.user)
+    userOrganizations?: UserOrganization[];
 
     @CreateDateColumn()
     createdAt!: Date;

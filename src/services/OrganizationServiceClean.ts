@@ -11,6 +11,8 @@ import { CREATOR_CONTROLLED_PERMISSIONS, PermissionKey } from "../constants/acce
 import { OrganizationPermission } from "../entities/OrganizationPermission";
 import { PermissionService } from "./PermissionService";
 import { Role } from "../entities/Role";
+import { Organization } from "../entities/Organization";
+import { OrgMemberRole, UserOrganization } from "../entities/UserOrganization";
 
 export class OrganizationService {
     private teamRepo = AppDataSource.getRepository(Team);
@@ -20,6 +22,8 @@ export class OrganizationService {
     private activityLogService = new ActivityLogService();
     private permissionService = new PermissionService();
     private roleRepo = AppDataSource.getRepository(Role);
+    private organizationRepo = AppDataSource.getRepository(Organization);
+    private userOrganizationRepo = AppDataSource.getRepository(UserOrganization);
 
     private async ensureTeamMember(actorId: string, teamId: string) {
         const actor = await this.userRepo.findOne({ where: { id: actorId }, relations: ["team"] });
@@ -54,7 +58,38 @@ export class OrganizationService {
 
         actor.team = savedTeam;
         actor.legacyRole = UserRole.SUPER_ADMIN;
+        actor.organizationId = savedTeam.id;
         await this.userRepo.save(actor);
+
+        const organizationExists = await this.organizationRepo.findOne({ where: { id: savedTeam.id } });
+        if (!organizationExists) {
+            const orgSlug = name
+                .toLowerCase()
+                .trim()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)/g, "") || `org-${savedTeam.id.slice(0, 8)}`;
+            await this.organizationRepo.save(
+                this.organizationRepo.create({
+                    id: savedTeam.id,
+                    name,
+                    slug: `${orgSlug}-${savedTeam.id.slice(0, 4)}`,
+                    ownerId: actor.id
+                })
+            );
+        }
+
+        const existingMembership = await this.userOrganizationRepo.findOne({
+            where: { userId: actor.id, organizationId: savedTeam.id }
+        });
+        if (!existingMembership) {
+            await this.userOrganizationRepo.save(
+                this.userOrganizationRepo.create({
+                    userId: actor.id,
+                    organizationId: savedTeam.id,
+                    role: OrgMemberRole.OWNER
+                })
+            );
+        }
 
         await this.activityLogService.log({
             action: ActivityAction.ORGANIZATION_CREATED,
@@ -80,11 +115,24 @@ export class OrganizationService {
         if (!team) throw new Error("Organization not found");
 
         user.team = team;
+        user.organizationId = team.id;
         if (user.legacyRole !== UserRole.SUPER_ADMIN && user.legacyRole !== UserRole.SUDO_ADMIN) {
             user.legacyRole = UserRole.MEMBER;
         }
 
         const savedUser = await this.userRepo.save(user);
+        const existingMembership = await this.userOrganizationRepo.findOne({
+            where: { userId: user.id, organizationId: team.id }
+        });
+        if (!existingMembership) {
+            await this.userOrganizationRepo.save(
+                this.userOrganizationRepo.create({
+                    userId: user.id,
+                    organizationId: team.id,
+                    role: OrgMemberRole.MEMBER
+                })
+            );
+        }
         await this.activityLogService.log({
             action: ActivityAction.MEMBER_JOINED,
             actorId,
@@ -132,12 +180,26 @@ export class OrganizationService {
             existingUser.fullName = name || existingUser.fullName;
             existingUser.legacyRole = role;
             existingUser.team = team;
+            existingUser.organizationId = team.id;
             savedUser = await this.userRepo.save(existingUser);
         } else {
             const tempPassword = crypto.randomBytes(8).toString("hex");
             const hashedPassword = await hashPassword(tempPassword);
-            const createdUser = this.userRepo.create({ fullName: name, email, password: hashedPassword, legacyRole: role, team });
+            const createdUser = this.userRepo.create({ fullName: name, email, password: hashedPassword, legacyRole: role, team, organizationId: team.id });
             savedUser = await this.userRepo.save(createdUser);
+        }
+
+        const existingMembership = await this.userOrganizationRepo.findOne({
+            where: { userId: savedUser.id, organizationId: team.id }
+        });
+        if (!existingMembership) {
+            await this.userOrganizationRepo.save(
+                this.userOrganizationRepo.create({
+                    userId: savedUser.id,
+                    organizationId: team.id,
+                    role: role === UserRole.SUPER_ADMIN || role === UserRole.SUDO_ADMIN ? OrgMemberRole.ADMIN : OrgMemberRole.MEMBER
+                })
+            );
         }
 
         await this.activityLogService.log({ action: ActivityAction.MEMBER_ADDED, actorId, targetUserId: savedUser.id, teamId, details: `${savedUser.email} added manually with role ${role}` });
@@ -161,8 +223,11 @@ export class OrganizationService {
         if (!member || member.team?.id !== teamId) throw new Error("Member not found in organization");
 
         member.team = undefined;
+        member.organizationId = undefined;
         if (member.legacyRole !== UserRole.SUDO_ADMIN) member.legacyRole = UserRole.MEMBER;
         const saved = await this.userRepo.save(member);
+
+        await this.userOrganizationRepo.delete({ userId: memberId, organizationId: teamId });
 
         await this.activityLogService.log({ action: ActivityAction.MEMBER_REMOVED, actorId, targetUserId: memberId, teamId, details: `${saved.email} removed from organization` });
         return { id: saved.id, email: saved.email };

@@ -16,6 +16,7 @@ import { AuditLog } from "../entities/AuditLog";
 import { ActivityLog } from "../entities/ActivityLog";
 import { TaskActivity } from "../entities/TaskActivity";
 import { TaskComment } from "../entities/TaskComment";
+import { UserOrganization } from "../entities/UserOrganization";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -59,7 +60,8 @@ export const AppDataSource = new DataSource({
         AuditLog,
         ActivityLog,
         TaskActivity,
-        TaskComment
+        TaskComment,
+        UserOrganization
     ],
     migrations: [],
     subscribers: [],

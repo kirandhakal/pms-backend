@@ -22,6 +22,7 @@ const AuditLog_1 = require("../entities/AuditLog");
 const ActivityLog_1 = require("../entities/ActivityLog");
 const TaskActivity_1 = require("../entities/TaskActivity");
 const TaskComment_1 = require("../entities/TaskComment");
+const UserOrganization_1 = require("../entities/UserOrganization");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const nodeEnv = (process.env.NODE_ENV || "").trim().toLowerCase();
@@ -60,7 +61,8 @@ exports.AppDataSource = new typeorm_1.DataSource({
         AuditLog_1.AuditLog,
         ActivityLog_1.ActivityLog,
         TaskActivity_1.TaskActivity,
-        TaskComment_1.TaskComment
+        TaskComment_1.TaskComment,
+        UserOrganization_1.UserOrganization
     ],
     migrations: [],
     subscribers: [],
