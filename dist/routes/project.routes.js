@@ -7,8 +7,10 @@ const User_1 = require("../entities/User");
 const router = (0, express_1.Router)();
 const projectController = new ProjectController_1.ProjectController();
 router.use(auth_1.authenticate);
-router.post("/", (0, auth_1.authorizeRoles)(User_1.UserRole.ADMIN, User_1.UserRole.SUPER_ADMIN), projectController.create);
-router.get("/", projectController.getAll);
-// Restricted Dashboard
+router.post("/", (0, auth_1.authorizeRoles)(User_1.UserRole.ADMIN, User_1.UserRole.SUPER_ADMIN, User_1.UserRole.MANAGER), projectController.create);
 router.get("/dashboard", (0, auth_1.authorizeRoles)(User_1.UserRole.ADMIN, User_1.UserRole.SUPER_ADMIN), projectController.getDashboard);
+router.get("/", projectController.getAll);
+router.get("/:id/workflow", projectController.getWorkflow);
+router.get("/:id", projectController.getById);
+router.post("/:id/members", (0, auth_1.authorizeRoles)(User_1.UserRole.ADMIN, User_1.UserRole.SUPER_ADMIN, User_1.UserRole.MANAGER), projectController.addMember);
 exports.default = router;

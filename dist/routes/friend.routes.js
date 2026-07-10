@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const FriendController_1 = require("../controllers/FriendController");
+const auth_1 = require("../middlewares/auth");
+const router = (0, express_1.Router)();
+const friendController = new FriendController_1.FriendController();
+router.use(auth_1.authenticate);
+router.get("/search", friendController.search);
+router.get("/", friendController.listFriends);
+router.get("/pending", friendController.listPending);
+router.post("/request", friendController.sendRequest);
+router.put("/request/:id", friendController.respond);
+router.get("/dm/:userId", friendController.getConversation);
+router.post("/dm", friendController.sendMessage);
+router.put("/dm/mute", friendController.setMute);
+exports.default = router;

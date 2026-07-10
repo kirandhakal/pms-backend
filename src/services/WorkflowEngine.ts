@@ -4,6 +4,8 @@ import { WorkflowStage, StageSettings } from "../entities/WorkflowStage";
 import { Task, TaskStatus } from "../entities/Task";
 import { TaskActivity, TaskActivityType } from "../entities/TaskActivity";
 import { ApiError } from "../middlewares/errorHandler";
+import { PROJECT_WORKFLOW_STAGES, canViewStage, ProjectRole } from "../constants/workflow-stages";
+import { worklogService } from "./WorklogService";
 
 export interface StageTransitionResult {
     success: boolean;
@@ -27,6 +29,7 @@ export interface CreateWorkflowDTO {
         isFinal?: boolean;
         settings?: StageSettings;
     }>;
+    isDefault?: boolean;
 }
 
 /**
@@ -69,7 +72,7 @@ export class WorkflowEngine {
                 requireAssignee: false,
                 notifyOnStageChange: true
             },
-            isDefault: false,
+            isDefault: data.isDefault ?? false,
             isActive: true
         });
 
@@ -99,6 +102,59 @@ export class WorkflowEngine {
         await this.workflowRepo.save(savedWorkflow);
 
         return this.getWorkflowById(savedWorkflow.id) as Promise<Workflow>;
+    }
+
+    /**
+     * Create a project-specific workflow with role-based stage visibility
+     */
+    async createProjectWorkflow(
+        projectName: string,
+        organizationId: string,
+        createdById?: string
+    ): Promise<Workflow> {
+        const stages = PROJECT_WORKFLOW_STAGES.map((stage) => ({
+            name: stage.name,
+            order: stage.order,
+            color: stage.color,
+            isDefault: stage.isDefault,
+            isFinal: stage.isFinal,
+            settings: {
+                category: stage.category,
+                assignedRole: stage.assignedRole,
+                visibleToRoles: stage.visibleToRoles,
+            },
+        }));
+
+        return this.createWorkflow({
+            name: `${projectName} Workflow`,
+            description: `Auto-generated workflow for ${projectName}`,
+            organizationId,
+            createdById,
+            isDefault: false,
+            settings: {
+                allowBackwardTransition: true,
+                requireAssignee: false,
+                notifyOnStageChange: true,
+            },
+            stages,
+        });
+    }
+
+    /**
+     * Filter workflow stages by viewer's project role
+     */
+    async getVisibleStages(workflowId: string, viewerRole: ProjectRole): Promise<WorkflowStage[]> {
+        const workflow = await this.getWorkflowById(workflowId);
+        if (!workflow) {
+            throw new ApiError("Workflow not found", 404);
+        }
+
+        return workflow.stages.filter((stage) =>
+            canViewStage(
+                { category: stage.settings?.category, settings: stage.settings },
+                viewerRole
+            )
+        );
     }
 
     /**
@@ -312,6 +368,15 @@ export class WorkflowEngine {
 
         // Execute onEnter hook for new stage
         await this.executeOnEnter(savedTask, toStage);
+
+        // Auto-generate worklog when task reaches final stage
+        if (toStage.isFinal) {
+            try {
+                await worklogService.createFromTaskCompletion(savedTask, userId);
+            } catch (err) {
+                console.warn("Auto worklog creation skipped:", (err as Error).message);
+            }
+        }
 
         // Log activity
         const activity = this.activityRepo.create({

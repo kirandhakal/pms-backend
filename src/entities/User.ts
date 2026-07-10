@@ -47,6 +47,10 @@ export class User {
     @Index()
     email!: string;
 
+    @Column({ unique: true, nullable: true })
+    @Index()
+    username?: string;
+
     @Column({ select: false, nullable: true })
     password!: string;
 

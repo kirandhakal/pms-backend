@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const WorklogController_1 = require("../controllers/WorklogController");
+const auth_1 = require("../middlewares/auth");
+const router = (0, express_1.Router)();
+const worklogController = new WorklogController_1.WorklogController();
+router.use(auth_1.authenticate);
+router.get("/project/:projectId", worklogController.listByProject);
+router.get("/user", worklogController.listByUser);
+router.post("/", worklogController.create);
+exports.default = router;

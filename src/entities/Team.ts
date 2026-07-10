@@ -10,6 +10,9 @@ export class Team {
     @Column()
     name!: string;
 
+    @Column({ nullable: true })
+    createdById?: string;
+
     @OneToMany(() => User, (user) => user.team)
     members!: User[];
 
