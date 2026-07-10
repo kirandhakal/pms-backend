@@ -13,6 +13,7 @@ declare global {
             legacyRole?: UserRole;
             organizationId?: string;
             departmentId?: string;
+            teamId?: string;
         }
     }
 }
@@ -39,7 +40,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     const sessionRepo = AppDataSource.getRepository(Session);
     const session = await sessionRepo.findOne({
         where: { token, isActive: true },
-        relations: ["user", "user.role"]
+        relations: ["user", "user.role", "user.team"]
     });
 
     if (!session) {
@@ -57,7 +58,8 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         role: session.user.role,
         legacyRole: session.user.legacyRole,
         organizationId: session.user.organizationId,
-        departmentId: session.user.departmentId
+        departmentId: session.user.departmentId,
+        teamId: session.user.team?.id,
     };
 
     next();

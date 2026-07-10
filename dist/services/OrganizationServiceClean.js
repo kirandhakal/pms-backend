@@ -55,7 +55,7 @@ class OrganizationService {
         const existing = await this.teamRepo.findOne({ where: { name } });
         if (existing)
             throw new Error("Organization with this name already exists");
-        const team = this.teamRepo.create({ name });
+        const team = this.teamRepo.create({ name, createdById: actorId });
         const savedTeam = await this.teamRepo.save(team);
         actor.team = savedTeam;
         actor.legacyRole = User_1.UserRole.SUPER_ADMIN;

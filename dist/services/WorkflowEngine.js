@@ -7,6 +7,8 @@ const WorkflowStage_1 = require("../entities/WorkflowStage");
 const Task_1 = require("../entities/Task");
 const TaskActivity_1 = require("../entities/TaskActivity");
 const errorHandler_1 = require("../middlewares/errorHandler");
+const workflow_stages_1 = require("../constants/workflow-stages");
+const WorklogService_1 = require("./WorklogService");
 /**
  * Default workflow stages
  */
@@ -47,7 +49,7 @@ class WorkflowEngine {
                 requireAssignee: false,
                 notifyOnStageChange: true
             },
-            isDefault: false,
+            isDefault: data.isDefault ?? false,
             isActive: true
         });
         const savedWorkflow = await this.workflowRepo.save(workflow);
@@ -71,6 +73,46 @@ class WorkflowEngine {
         savedWorkflow.transitions = transitions;
         await this.workflowRepo.save(savedWorkflow);
         return this.getWorkflowById(savedWorkflow.id);
+    }
+    /**
+     * Create a project-specific workflow with role-based stage visibility
+     */
+    async createProjectWorkflow(projectName, organizationId, createdById) {
+        const stages = workflow_stages_1.PROJECT_WORKFLOW_STAGES.map((stage) => ({
+            name: stage.name,
+            order: stage.order,
+            color: stage.color,
+            isDefault: stage.isDefault,
+            isFinal: stage.isFinal,
+            settings: {
+                category: stage.category,
+                assignedRole: stage.assignedRole,
+                visibleToRoles: stage.visibleToRoles,
+            },
+        }));
+        return this.createWorkflow({
+            name: `${projectName} Workflow`,
+            description: `Auto-generated workflow for ${projectName}`,
+            organizationId,
+            createdById,
+            isDefault: false,
+            settings: {
+                allowBackwardTransition: true,
+                requireAssignee: false,
+                notifyOnStageChange: true,
+            },
+            stages,
+        });
+    }
+    /**
+     * Filter workflow stages by viewer's project role
+     */
+    async getVisibleStages(workflowId, viewerRole) {
+        const workflow = await this.getWorkflowById(workflowId);
+        if (!workflow) {
+            throw new errorHandler_1.ApiError("Workflow not found", 404);
+        }
+        return workflow.stages.filter((stage) => (0, workflow_stages_1.canViewStage)({ category: stage.settings?.category, settings: stage.settings }, viewerRole));
     }
     /**
      * Get workflow with stages
@@ -235,6 +277,15 @@ class WorkflowEngine {
         const savedTask = await this.taskRepo.save(task);
         // Execute onEnter hook for new stage
         await this.executeOnEnter(savedTask, toStage);
+        // Auto-generate worklog when task reaches final stage
+        if (toStage.isFinal) {
+            try {
+                await WorklogService_1.worklogService.createFromTaskCompletion(savedTask, userId);
+            }
+            catch (err) {
+                console.warn("Auto worklog creation skipped:", err.message);
+            }
+        }
         // Log activity
         const activity = this.activityRepo.create({
             taskId,

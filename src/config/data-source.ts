@@ -16,6 +16,13 @@ import { AuditLog } from "../entities/AuditLog";
 import { ActivityLog } from "../entities/ActivityLog";
 import { TaskActivity } from "../entities/TaskActivity";
 import { TaskComment } from "../entities/TaskComment";
+import { Worklog } from "../entities/Worklog";
+import { Channel } from "../entities/Channel";
+import { ChannelMember } from "../entities/ChannelMember";
+import { ChannelMessage } from "../entities/ChannelMessage";
+import { Friendship } from "../entities/Friendship";
+import { DirectMessage } from "../entities/DirectMessage";
+import { ProjectMember } from "../entities/ProjectMember";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -59,7 +66,14 @@ export const AppDataSource = new DataSource({
         AuditLog,
         ActivityLog,
         TaskActivity,
-        TaskComment
+        TaskComment,
+        Worklog,
+        Channel,
+        ChannelMember,
+        ChannelMessage,
+        Friendship,
+        DirectMessage,
+        ProjectMember
     ],
     migrations: [],
     subscribers: [],

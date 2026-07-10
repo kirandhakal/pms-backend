@@ -19,7 +19,7 @@ const authenticate = async (req, res, next) => {
     const sessionRepo = data_source_1.AppDataSource.getRepository(Session_1.Session);
     const session = await sessionRepo.findOne({
         where: { token, isActive: true },
-        relations: ["user", "user.role"]
+        relations: ["user", "user.role", "user.team"]
     });
     if (!session) {
         res.status(401).json({ message: "Session inactive or logged out" });
@@ -34,7 +34,8 @@ const authenticate = async (req, res, next) => {
         role: session.user.role,
         legacyRole: session.user.legacyRole,
         organizationId: session.user.organizationId,
-        departmentId: session.user.departmentId
+        departmentId: session.user.departmentId,
+        teamId: session.user.team?.id,
     };
     next();
 };

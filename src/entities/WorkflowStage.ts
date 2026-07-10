@@ -13,14 +13,17 @@ import { Workflow } from "./Workflow";
 import { Task } from "./Task";
 
 export interface StageSettings {
-    autoAssignTo?: string;       // User ID for auto-assignment
+    autoAssignTo?: string;
     requireApproval?: boolean;
     approverRoles?: string[];
-    maxWipLimit?: number;        // Max work in progress
-    slaHours?: number;           // SLA in hours
+    maxWipLimit?: number;
+    slaHours?: number;
     notifyOnEntry?: boolean;
     notifyOnExit?: boolean;
     webhookUrl?: string;
+    category?: string;
+    assignedRole?: string;
+    visibleToRoles?: string[];
 }
 
 @Entity("workflow_stages")

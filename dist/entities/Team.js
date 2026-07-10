@@ -25,6 +25,10 @@ __decorate([
     __metadata("design:type", String)
 ], Team.prototype, "name", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Team.prototype, "createdById", void 0);
+__decorate([
     (0, typeorm_1.OneToMany)(() => User_1.User, (user) => user.team),
     __metadata("design:type", Array)
 ], Team.prototype, "members", void 0);
