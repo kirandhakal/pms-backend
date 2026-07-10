@@ -61,24 +61,21 @@ class OrganizationService {
             throw new Error("Organization with this name already exists");
         const team = this.teamRepo.create({ name, createdById: actorId });
         const savedTeam = await this.teamRepo.save(team);
+        const orgSlug = name
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "") || `org-${savedTeam.id.slice(0, 8)}`;
+        await this.organizationRepo.save(this.organizationRepo.create({
+            id: savedTeam.id,
+            name,
+            slug: `${orgSlug}-${savedTeam.id.slice(0, 4)}`,
+            ownerId: actor.id
+        }));
         actor.team = savedTeam;
         actor.legacyRole = User_1.UserRole.SUPER_ADMIN;
         actor.organizationId = savedTeam.id;
         await this.userRepo.save(actor);
-        const organizationExists = await this.organizationRepo.findOne({ where: { id: savedTeam.id } });
-        if (!organizationExists) {
-            const orgSlug = name
-                .toLowerCase()
-                .trim()
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/(^-|-$)/g, "") || `org-${savedTeam.id.slice(0, 8)}`;
-            await this.organizationRepo.save(this.organizationRepo.create({
-                id: savedTeam.id,
-                name,
-                slug: `${orgSlug}-${savedTeam.id.slice(0, 4)}`,
-                ownerId: actor.id
-            }));
-        }
         const existingMembership = await this.userOrganizationRepo.findOne({
             where: { userId: actor.id, organizationId: savedTeam.id }
         });

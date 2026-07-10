@@ -29,6 +29,8 @@ const ChannelMessage_1 = require("../entities/ChannelMessage");
 const Friendship_1 = require("../entities/Friendship");
 const DirectMessage_1 = require("../entities/DirectMessage");
 const ProjectMember_1 = require("../entities/ProjectMember");
+const OrganizationPermission_1 = require("../entities/OrganizationPermission");
+const UserOrganization_1 = require("../entities/UserOrganization");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const nodeEnv = (process.env.NODE_ENV || "").trim().toLowerCase();
@@ -74,7 +76,9 @@ exports.AppDataSource = new typeorm_1.DataSource({
         ChannelMessage_1.ChannelMessage,
         Friendship_1.Friendship,
         DirectMessage_1.DirectMessage,
-        ProjectMember_1.ProjectMember
+        ProjectMember_1.ProjectMember,
+        OrganizationPermission_1.OrganizationPermission,
+        UserOrganization_1.UserOrganization
     ],
     migrations: [],
     subscribers: [],
