@@ -23,6 +23,8 @@ import { ChannelMessage } from "../entities/ChannelMessage";
 import { Friendship } from "../entities/Friendship";
 import { DirectMessage } from "../entities/DirectMessage";
 import { ProjectMember } from "../entities/ProjectMember";
+import { OrganizationPermission } from "../entities/OrganizationPermission";
+import { UserOrganization } from "../entities/UserOrganization";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -73,7 +75,9 @@ export const AppDataSource = new DataSource({
         ChannelMessage,
         Friendship,
         DirectMessage,
-        ProjectMember
+        ProjectMember,
+        OrganizationPermission,
+        UserOrganization
     ],
     migrations: [],
     subscribers: [],
