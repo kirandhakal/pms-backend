@@ -21,10 +21,11 @@ export class MeetingController {
 
     async list(req: AuthRequest, res: Response) {
         try {
-            const { organizationId, projectId } = req.query;
+            const organizationId = String(req.query.organizationId || "");
+            const projectId = req.query.projectId ? String(req.query.projectId) : undefined;
             const meetings = await meetingService.getMeetingsByOrganization(
-                organizationId as string,
-                projectId as string | undefined
+                organizationId,
+                projectId
             );
             res.json({ data: meetings });
         } catch (err: any) {
@@ -34,7 +35,7 @@ export class MeetingController {
 
     async getById(req: AuthRequest, res: Response) {
         try {
-            const meeting = await meetingService.getMeetingById(req.params.id);
+            const meeting = await meetingService.getMeetingById(String(req.params.id));
             if (!meeting) {
                 return res.status(404).json({ message: "Meeting not found" });
             }
@@ -46,7 +47,7 @@ export class MeetingController {
 
     async update(req: AuthRequest, res: Response) {
         try {
-            const meeting = await meetingService.updateMeeting(req.params.id, req.body);
+            const meeting = await meetingService.updateMeeting(String(req.params.id), req.body);
             res.json({ message: "Meeting updated", data: meeting });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
@@ -57,7 +58,7 @@ export class MeetingController {
         try {
             const { status } = req.body;
             const meeting = await meetingService.updateMeetingStatus(
-                req.params.id,
+                String(req.params.id),
                 status as MeetingStatus
             );
             res.json({ message: "Meeting status updated", data: meeting });
@@ -72,7 +73,7 @@ export class MeetingController {
         try {
             const { userIds } = req.body;
             const participants = await meetingService.addParticipants(
-                req.params.id,
+                String(req.params.id),
                 userIds
             );
             res.status(201).json({ data: participants });
@@ -83,7 +84,7 @@ export class MeetingController {
 
     async removeParticipant(req: AuthRequest, res: Response) {
         try {
-            await meetingService.removeParticipant(req.params.id, req.params.userId);
+            await meetingService.removeParticipant(String(req.params.id), String(req.params.userId));
             res.json({ message: "Participant removed" });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
@@ -94,7 +95,7 @@ export class MeetingController {
         try {
             const { userId, attended } = req.body;
             const participant = await meetingService.markAttendance(
-                req.params.id,
+                String(req.params.id),
                 userId,
                 attended
             );
@@ -109,7 +110,7 @@ export class MeetingController {
     async addNote(req: AuthRequest, res: Response) {
         try {
             const note = await meetingService.addNote(
-                req.params.id,
+                String(req.params.id),
                 req.user!.id,
                 req.body.content
             );
@@ -121,7 +122,7 @@ export class MeetingController {
 
     async getNotes(req: AuthRequest, res: Response) {
         try {
-            const notes = await meetingService.getNotes(req.params.id);
+            const notes = await meetingService.getNotes(String(req.params.id));
             res.json({ data: notes });
         } catch (err: any) {
             res.status(err.statusCode || 500).json({ message: err.message });
@@ -133,7 +134,7 @@ export class MeetingController {
     async generateMom(req: AuthRequest, res: Response) {
         try {
             const mom = await meetingService.generateMom(
-                req.params.id,
+                String(req.params.id),
                 req.user!.id,
                 req.body
             );
@@ -145,7 +146,7 @@ export class MeetingController {
 
     async getMom(req: AuthRequest, res: Response) {
         try {
-            const mom = await meetingService.getMom(req.params.id);
+            const mom = await meetingService.getMom(String(req.params.id));
             if (!mom) {
                 return res.status(404).json({ message: "MOM not found for this meeting" });
             }
@@ -157,7 +158,7 @@ export class MeetingController {
 
     async updateMom(req: AuthRequest, res: Response) {
         try {
-            const mom = await meetingService.updateMom(req.params.momId, req.body);
+            const mom = await meetingService.updateMom(String(req.params.momId), req.body);
             res.json({ message: "MOM updated", data: mom });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
@@ -168,7 +169,7 @@ export class MeetingController {
 
     async addActionItem(req: AuthRequest, res: Response) {
         try {
-            const item = await meetingService.addActionItem(req.params.momId, req.body);
+            const item = await meetingService.addActionItem(String(req.params.momId), req.body);
             res.status(201).json({ data: item });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
@@ -178,7 +179,7 @@ export class MeetingController {
     async updateActionItem(req: AuthRequest, res: Response) {
         try {
             const item = await meetingService.updateActionItem(
-                req.params.actionItemId,
+                String(req.params.actionItemId),
                 req.body
             );
             res.json({ data: item });
@@ -191,7 +192,7 @@ export class MeetingController {
         try {
             const { projectId } = req.body;
             const result = await meetingService.convertActionItemToTask(
-                req.params.actionItemId,
+                String(req.params.actionItemId),
                 projectId,
                 req.user!.id
             );

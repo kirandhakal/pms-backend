@@ -5,8 +5,7 @@ import { teamRoleService } from "../services/TeamRoleService";
 export class TeamRoleController {
     async listRoles(req: AuthRequest, res: Response) {
         try {
-            const orgId = req.params.orgId;
-            const roles = await teamRoleService.getRolesByOrganization(orgId);
+            const roles = await teamRoleService.getRolesByOrganization(String(req.params.orgId));
             res.json({ data: roles });
         } catch (err: any) {
             res.status(err.statusCode || 500).json({ message: err.message });
@@ -15,9 +14,8 @@ export class TeamRoleController {
 
     async createRole(req: AuthRequest, res: Response) {
         try {
-            const orgId = req.params.orgId;
             const { name } = req.body;
-            const role = await teamRoleService.createRole(orgId, name);
+            const role = await teamRoleService.createRole(String(req.params.orgId), name);
             res.status(201).json({ message: "Team role created", data: role });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
@@ -26,7 +24,7 @@ export class TeamRoleController {
 
     async deleteRole(req: AuthRequest, res: Response) {
         try {
-            await teamRoleService.deleteRole(req.params.roleId);
+            await teamRoleService.deleteRole(String(req.params.roleId));
             res.json({ message: "Team role deleted" });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
@@ -35,8 +33,7 @@ export class TeamRoleController {
 
     async seedDefaults(req: AuthRequest, res: Response) {
         try {
-            const orgId = req.params.orgId;
-            const roles = await teamRoleService.seedDefaultRoles(orgId);
+            const roles = await teamRoleService.seedDefaultRoles(String(req.params.orgId));
             res.json({ message: "Default team roles seeded", data: roles });
         } catch (err: any) {
             res.status(err.statusCode || 500).json({ message: err.message });
@@ -45,7 +42,7 @@ export class TeamRoleController {
 
     async listTeamMembers(req: AuthRequest, res: Response) {
         try {
-            const members = await teamRoleService.getTeamMembers(req.params.teamId);
+            const members = await teamRoleService.getTeamMembers(String(req.params.teamId));
             res.json({ data: members });
         } catch (err: any) {
             res.status(err.statusCode || 500).json({ message: err.message });
@@ -56,7 +53,7 @@ export class TeamRoleController {
         try {
             const { userId, teamRoleId } = req.body;
             const membership = await teamRoleService.addTeamMember(
-                req.params.teamId,
+                String(req.params.teamId),
                 userId,
                 teamRoleId
             );
@@ -70,8 +67,8 @@ export class TeamRoleController {
         try {
             const { teamRoleId } = req.body;
             const membership = await teamRoleService.updateTeamMemberRole(
-                req.params.teamId,
-                req.params.userId,
+                String(req.params.teamId),
+                String(req.params.userId),
                 teamRoleId
             );
             res.json({ message: "Team member role updated", data: membership });
@@ -82,7 +79,7 @@ export class TeamRoleController {
 
     async removeTeamMember(req: AuthRequest, res: Response) {
         try {
-            await teamRoleService.removeTeamMember(req.params.teamId, req.params.userId);
+            await teamRoleService.removeTeamMember(String(req.params.teamId), String(req.params.userId));
             res.json({ message: "Team member removed" });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });

@@ -9,6 +9,8 @@ import workflowRoutes from "./workflow.routes";
 import channelRoutes from "./channel.routes";
 import friendRoutes from "./friend.routes";
 import worklogRoutes from "./worklog.routes";
+import teamRoleRoutes from "./team-role.routes";
+import meetingRoutes from "./meeting.routes";
 
 const router = Router();
 
@@ -22,5 +24,7 @@ router.use("/workflows", workflowRoutes);
 router.use("/channels", channelRoutes);
 router.use("/friends", friendRoutes);
 router.use("/worklogs", worklogRoutes);
+router.use(teamRoleRoutes);          // /api/organizations/:orgId/team-roles + /api/teams/:teamId/members
+router.use("/meetings", meetingRoutes); // /api/meetings/*
 
 export default router;
