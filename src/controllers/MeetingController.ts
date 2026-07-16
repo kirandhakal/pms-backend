@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { AuthRequest } from "../middlewares/auth";
 import { meetingService } from "../services/MeetingService";
-import { MeetingStatus, MeetingVisibility } from "../entities/Meeting";
+import { MeetingStatus } from "../entities/Meeting";
 
 export class MeetingController {
     async create(req: AuthRequest, res: Response) {
@@ -226,28 +226,9 @@ export class MeetingController {
 
     async getInvitePreview(req: AuthRequest, res: Response) {
         try {
-            const token = String(req.params.token || req.query.token || "");
-            const meeting = await meetingService.getMeetingByInviteToken(token);
-            if (!meeting) {
-                return res.status(404).json({ message: "Invite not found" });
-            }
-            res.json({
-                data: {
-                    id: meeting.id,
-                    title: meeting.title,
-                    topic: meeting.topic,
-                    scheduledAt: meeting.scheduledAt,
-                    status: meeting.status,
-                    visibility: meeting.visibility,
-                    organizer: meeting.createdBy
-                        ? {
-                              id: meeting.createdBy.id,
-                              fullName: meeting.createdBy.fullName,
-                          }
-                        : null,
-                    canJoinPublicly: meeting.visibility === MeetingVisibility.PUBLIC,
-                },
-            });
+            const slug = String(req.params.token || req.params.slug || req.query.token || "");
+            const preview = await meetingService.getPublicPreview(slug);
+            res.json({ data: { ...preview, canJoinPublicly: true } });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
         }
@@ -255,8 +236,11 @@ export class MeetingController {
 
     async joinViaInvite(req: AuthRequest, res: Response) {
         try {
-            const token = String(req.body.token || req.params.token || "");
-            const meeting = await meetingService.joinViaInviteToken(req.user!.id, token);
+            const slug = String(req.body.token || req.body.slug || req.params.slug || "");
+            if (!req.user?.id) {
+                return res.status(401).json({ message: "Sign in required, or use guest join" });
+            }
+            const meeting = await meetingService.joinViaSlug(req.user.id, slug);
             res.json({ message: "Joined meeting", data: meeting });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
@@ -265,11 +249,10 @@ export class MeetingController {
 
     async regenerateInvite(req: AuthRequest, res: Response) {
         try {
-            const makePublic = req.body?.makePublic !== false;
-            const result = await meetingService.regenerateInviteLink(
-                String(req.params.id),
-                makePublic
-            );
+            const result = await meetingService.regenerateInviteLink(String(req.params.id), {
+                makePublic: req.body?.makePublic !== false,
+                allowGuestJoin: req.body?.allowGuestJoin,
+            });
             res.json(result);
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });

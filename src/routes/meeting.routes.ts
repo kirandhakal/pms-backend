@@ -21,6 +21,7 @@ const createMeetingSchema = z.object({
     durationMins: z.number().int().positive().optional(),
     participantIds: z.array(z.string().uuid()).optional(),
     visibility: z.enum(["PRIVATE", "PUBLIC"]).optional(),
+    allowGuestJoin: z.boolean().optional(),
 });
 
 const updateMeetingSchema = z.object({
@@ -32,6 +33,7 @@ const updateMeetingSchema = z.object({
     channelId: z.string().uuid().optional(),
     projectId: z.string().uuid().optional(),
     visibility: z.enum(["PRIVATE", "PUBLIC"]).optional(),
+    allowGuestJoin: z.boolean().optional(),
 });
 
 const updateStatusSchema = z.object({
@@ -69,8 +71,9 @@ const markAttendanceSchema = z.object({
 });
 
 const joinInviteSchema = z.object({
-    token: z.string().min(8),
-});
+    token: z.string().min(3).optional(),
+    slug: z.string().min(3).optional(),
+}).refine((d) => d.token || d.slug, { message: "slug or token required" });
 
 router.use(authenticate);
 

@@ -5,13 +5,11 @@ import {
     ManyToOne,
     JoinColumn,
     Index,
-    Unique,
 } from "typeorm";
 import { Meeting } from "./Meeting";
 import { User } from "./User";
 
 @Entity("meeting_participants")
-@Unique(["meetingId", "userId"])
 export class MeetingParticipant {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
@@ -24,13 +22,20 @@ export class MeetingParticipant {
     @Index()
     meetingId!: string;
 
-    @ManyToOne(() => User, { onDelete: "CASCADE" })
+    /** Null when guest joins without an account */
+    @ManyToOne(() => User, { onDelete: "CASCADE", nullable: true })
     @JoinColumn({ name: "userId" })
-    user!: User;
+    user?: User;
 
-    @Column()
+    @Column({ nullable: true })
     @Index()
-    userId!: string;
+    userId?: string;
+
+    @Column({ length: 120, nullable: true })
+    guestName?: string;
+
+    @Column({ length: 255, nullable: true })
+    guestEmail?: string;
 
     @Column({ default: false })
     isOrganizer!: boolean;

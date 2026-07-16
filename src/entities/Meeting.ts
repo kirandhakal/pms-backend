@@ -35,7 +35,6 @@ export class Meeting {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
-    /** Null for personal/individual meetings */
     @ManyToOne(() => Organization, { onDelete: "CASCADE", nullable: true })
     @JoinColumn({ name: "organizationId" })
     organization?: Organization;
@@ -82,10 +81,17 @@ export class Meeting {
     @Column({ type: "enum", enum: MeetingVisibility, default: MeetingVisibility.PRIVATE })
     visibility!: MeetingVisibility;
 
-    /** Shareable join token — anyone with link can join if PUBLIC */
-    @Column({ unique: true, nullable: true })
+    /**
+     * Short public slug used in join URLs, e.g. "standup-k7m2"
+     * Stored in inviteToken column for backward compatibility with existing rows.
+     */
+    @Column({ name: "inviteToken", unique: true, nullable: true })
     @Index()
-    inviteToken?: string;
+    inviteSlug?: string;
+
+    /** When true, guests without an account can join via the public link */
+    @Column({ default: false })
+    allowGuestJoin!: boolean;
 
     @ManyToOne(() => User, { onDelete: "CASCADE" })
     @JoinColumn({ name: "createdById" })

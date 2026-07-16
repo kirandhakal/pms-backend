@@ -24,8 +24,24 @@ export class MeetingService {
         );
     }
 
-    private makeInviteToken() {
-        return crypto.randomBytes(24).toString("hex");
+    /** Normalize topic to a short standard slug prefix */
+    private topicPrefix(topic?: string): string {
+        const raw = (topic || "meet").toLowerCase().replace(/[^a-z0-9]+/g, "");
+        const known = ["standup", "planning", "general", "project", "personal", "other", "meet"];
+        if (known.includes(raw)) return raw.slice(0, 8);
+        return (raw.slice(0, 8) || "meet");
+    }
+
+    /** Short slug: standup-k7m2 */
+    private async makeInviteSlug(topic?: string): Promise<string> {
+        const prefix = this.topicPrefix(topic);
+        for (let i = 0; i < 12; i++) {
+            const suffix = crypto.randomBytes(2).toString("hex"); // 4 hex chars
+            const slug = `${prefix}-${suffix}`;
+            const exists = await this.meetingRepo.findOne({ where: { inviteSlug: slug } });
+            if (!exists) return slug;
+        }
+        return `${prefix}-${crypto.randomBytes(3).toString("hex")}`;
     }
 
     async createMeeting(data: {
@@ -40,26 +56,31 @@ export class MeetingService {
         createdById: string;
         participantIds?: string[];
         visibility?: MeetingVisibility;
+        allowGuestJoin?: boolean;
         isPersonal?: boolean;
     }): Promise<Meeting> {
         const isPersonal = data.isPersonal || !data.organizationId;
         const visibility = data.visibility || MeetingVisibility.PRIVATE;
-        const inviteToken =
-            visibility === MeetingVisibility.PUBLIC ? this.makeInviteToken() : this.makeInviteToken();
+        const topic =
+            data.topic || (data.projectId ? "project" : isPersonal ? "personal" : "general");
+        const allowGuestJoin =
+            visibility === MeetingVisibility.PUBLIC ? !!data.allowGuestJoin : false;
+        const inviteSlug = await this.makeInviteSlug(topic);
 
         const meeting = this.meetingRepo.create({
             organizationId: isPersonal ? undefined : data.organizationId,
             projectId: data.projectId,
             channelId: data.channelId,
             title: data.title,
-            topic: data.topic || (data.projectId ? "project" : isPersonal ? "personal" : "general"),
+            topic,
             agenda: data.agenda,
             scheduledAt: new Date(data.scheduledAt),
             durationMins: data.durationMins ?? 30,
             createdById: data.createdById,
             status: MeetingStatus.SCHEDULED,
             visibility,
-            inviteToken,
+            allowGuestJoin,
+            inviteSlug,
         });
 
         const saved = await this.meetingRepo.save(meeting);
@@ -184,6 +205,7 @@ export class MeetingService {
             channelId: string;
             projectId: string;
             visibility: MeetingVisibility;
+            allowGuestJoin: boolean;
         }>
     ): Promise<Meeting> {
         const meeting = await this.meetingRepo.findOne({ where: { id } });
@@ -198,9 +220,16 @@ export class MeetingService {
         if (data.projectId !== undefined) meeting.projectId = data.projectId;
         if (data.visibility !== undefined) {
             meeting.visibility = data.visibility;
-            if (data.visibility === MeetingVisibility.PUBLIC && !meeting.inviteToken) {
-                meeting.inviteToken = this.makeInviteToken();
+            if (data.visibility === MeetingVisibility.PRIVATE) {
+                meeting.allowGuestJoin = false;
             }
+            if (!meeting.inviteSlug) {
+                meeting.inviteSlug = await this.makeInviteSlug(meeting.topic);
+            }
+        }
+        if (data.allowGuestJoin !== undefined) {
+            meeting.allowGuestJoin =
+                meeting.visibility === MeetingVisibility.PUBLIC ? data.allowGuestJoin : false;
         }
 
         await this.meetingRepo.save(meeting);
@@ -228,23 +257,52 @@ export class MeetingService {
     }
 
     getInviteLink(meeting: Meeting): string | null {
-        if (!meeting.inviteToken) return null;
-        return `${this.frontendBaseUrl()}/meetings/join?token=${meeting.inviteToken}`;
+        if (!meeting.inviteSlug) return null;
+        return `${this.frontendBaseUrl()}/m/${meeting.inviteSlug}`;
     }
 
-    async getMeetingByInviteToken(token: string): Promise<Meeting | null> {
+    async getMeetingBySlug(slug: string): Promise<Meeting | null> {
         return this.meetingRepo.findOne({
-            where: { inviteToken: token },
+            where: { inviteSlug: slug },
             relations: ["participants", "participants.user", "createdBy", "project"],
         });
     }
 
+    /** @deprecated use getMeetingBySlug */
+    async getMeetingByInviteToken(token: string): Promise<Meeting | null> {
+        return this.getMeetingBySlug(token);
+    }
+
+    async getPublicPreview(slug: string) {
+        const meeting = await this.getMeetingBySlug(slug);
+        if (!meeting) throw new ApiError("Meeting not found", 404);
+        if (meeting.visibility !== MeetingVisibility.PUBLIC) {
+            throw new ApiError("This meeting is private", 403);
+        }
+
+        return {
+            slug: meeting.inviteSlug,
+            title: meeting.title,
+            topic: meeting.topic,
+            agenda: meeting.agenda,
+            scheduledAt: meeting.scheduledAt,
+            durationMins: meeting.durationMins,
+            status: meeting.status,
+            visibility: meeting.visibility,
+            allowGuestJoin: meeting.allowGuestJoin,
+            organizer: meeting.createdBy
+                ? { fullName: meeting.createdBy.fullName }
+                : null,
+            participantCount: meeting.participants?.length ?? 0,
+        };
+    }
+
     /**
-     * Join via invite link. Public meetings allow anyone; private require existing invite/participant.
+     * Join as authenticated user via short public slug.
      */
-    async joinViaInviteToken(userId: string, token: string): Promise<Meeting> {
-        const meeting = await this.getMeetingByInviteToken(token);
-        if (!meeting) throw new ApiError("Meeting invite not found", 404);
+    async joinViaSlug(userId: string, slug: string): Promise<Meeting> {
+        const meeting = await this.getMeetingBySlug(slug);
+        if (!meeting) throw new ApiError("Meeting not found", 404);
 
         if (
             meeting.status === MeetingStatus.COMPLETED ||
@@ -253,15 +311,15 @@ export class MeetingService {
             throw new ApiError("This meeting has ended", 400);
         }
 
+        if (meeting.visibility !== MeetingVisibility.PUBLIC) {
+            throw new ApiError("This meeting is private. Ask the organizer to invite you.", 403);
+        }
+
         const existing = await this.participantRepo.findOne({
             where: { meetingId: meeting.id, userId },
         });
         if (existing) {
             return this.getMeetingById(meeting.id) as Promise<Meeting>;
-        }
-
-        if (meeting.visibility !== MeetingVisibility.PUBLIC) {
-            throw new ApiError("This meeting is private. Ask the organizer to invite you.", 403);
         }
 
         await this.participantRepo.save(
@@ -275,12 +333,78 @@ export class MeetingService {
         return this.getMeetingById(meeting.id) as Promise<Meeting>;
     }
 
-    async regenerateInviteLink(meetingId: string, makePublic = true): Promise<{ inviteUrl: string; meeting: Meeting }> {
+    /**
+     * Guest join (no account) — only when allowGuestJoin is true.
+     */
+    async joinAsGuest(
+        slug: string,
+        data: { name: string; email?: string }
+    ): Promise<{ meeting: Meeting; guest: { name: string; email?: string } }> {
+        const meeting = await this.getMeetingBySlug(slug);
+        if (!meeting) throw new ApiError("Meeting not found", 404);
+
+        if (meeting.visibility !== MeetingVisibility.PUBLIC || !meeting.allowGuestJoin) {
+            throw new ApiError("Guest join is not enabled for this meeting. Please sign in.", 403);
+        }
+
+        if (
+            meeting.status === MeetingStatus.COMPLETED ||
+            meeting.status === MeetingStatus.CANCELLED
+        ) {
+            throw new ApiError("This meeting has ended", 400);
+        }
+
+        const name = data.name.trim();
+        if (!name) throw new ApiError("Name is required", 400);
+        const email = data.email?.trim().toLowerCase() || undefined;
+
+        if (email) {
+            const existingGuest = await this.participantRepo.findOne({
+                where: { meetingId: meeting.id, guestEmail: email },
+            });
+            if (existingGuest) {
+                return {
+                    meeting: (await this.getMeetingById(meeting.id))!,
+                    guest: { name: existingGuest.guestName || name, email },
+                };
+            }
+        }
+
+        await this.participantRepo.save(
+            this.participantRepo.create({
+                meetingId: meeting.id,
+                guestName: name,
+                guestEmail: email,
+                isOrganizer: false,
+            })
+        );
+
+        return {
+            meeting: (await this.getMeetingById(meeting.id))!,
+            guest: { name, email },
+        };
+    }
+
+    /** @deprecated */
+    async joinViaInviteToken(userId: string, token: string): Promise<Meeting> {
+        return this.joinViaSlug(userId, token);
+    }
+
+    async regenerateInviteLink(
+        meetingId: string,
+        options: { makePublic?: boolean; allowGuestJoin?: boolean } = {}
+    ): Promise<{ inviteUrl: string; meeting: Meeting }> {
         const meeting = await this.meetingRepo.findOne({ where: { id: meetingId } });
         if (!meeting) throw new ApiError("Meeting not found", 404);
 
-        meeting.inviteToken = this.makeInviteToken();
-        if (makePublic) meeting.visibility = MeetingVisibility.PUBLIC;
+        if (options.makePublic !== false) {
+            meeting.visibility = MeetingVisibility.PUBLIC;
+        }
+        if (options.allowGuestJoin !== undefined) {
+            meeting.allowGuestJoin =
+                meeting.visibility === MeetingVisibility.PUBLIC ? options.allowGuestJoin : false;
+        }
+        meeting.inviteSlug = await this.makeInviteSlug(meeting.topic);
         await this.meetingRepo.save(meeting);
 
         const full = (await this.getMeetingById(meetingId))!;
