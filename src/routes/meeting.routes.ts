@@ -1,10 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/auth";
-import { loadPermissions, authorize } from "../middlewares/permission";
-import { resolveTenant, requireTenant } from "../middlewares/tenantResolver";
 import { auditLog } from "../middlewares/auditLogger";
 import { AuditAction } from "../entities/AuditLog";
-import { PermissionResource, PermissionAction } from "../config/permissions";
 import { MeetingController } from "../controllers/MeetingController";
 import { validateBody } from "../middlewares/validate";
 import { z } from "zod";
@@ -12,28 +9,29 @@ import { z } from "zod";
 const router = Router();
 const ctrl = new MeetingController();
 
-// ──────────────────────────────────────────────
-// Validation Schemas
-// ──────────────────────────────────────────────
-
 const createMeetingSchema = z.object({
-    organizationId: z.string().uuid(),
+    organizationId: z.string().uuid().optional(),
+    isPersonal: z.boolean().optional(),
     projectId: z.string().uuid().optional(),
     channelId: z.string().uuid().optional(),
     title: z.string().min(1).max(255),
+    topic: z.string().max(100).optional(),
     agenda: z.string().optional(),
     scheduledAt: z.string().datetime(),
     durationMins: z.number().int().positive().optional(),
     participantIds: z.array(z.string().uuid()).optional(),
+    visibility: z.enum(["PRIVATE", "PUBLIC"]).optional(),
 });
 
 const updateMeetingSchema = z.object({
     title: z.string().min(1).max(255).optional(),
+    topic: z.string().max(100).optional(),
     agenda: z.string().optional(),
     scheduledAt: z.string().datetime().optional(),
     durationMins: z.number().int().positive().optional(),
     channelId: z.string().uuid().optional(),
     projectId: z.string().uuid().optional(),
+    visibility: z.enum(["PRIVATE", "PUBLIC"]).optional(),
 });
 
 const updateStatusSchema = z.object({
@@ -60,28 +58,9 @@ const generateMomSchema = z.object({
             })
         )
         .optional(),
-});
-
-const updateMomSchema = z.object({
-    summary: z.string().min(1).optional(),
-    decisions: z.string().optional(),
-});
-
-const addActionItemSchema = z.object({
-    description: z.string().min(1),
-    assigneeId: z.string().uuid().optional(),
-    dueDate: z.string().optional(),
-});
-
-const updateActionItemSchema = z.object({
-    description: z.string().min(1).optional(),
-    assigneeId: z.string().uuid().optional(),
-    dueDate: z.string().optional(),
-    status: z.enum(["OPEN", "DONE"]).optional(),
-});
-
-const convertToTaskSchema = z.object({
-    projectId: z.string().uuid(),
+    postToChannel: z.boolean().optional(),
+    convertActionItemsToTasks: z.boolean().optional(),
+    projectId: z.string().uuid().optional(),
 });
 
 const markAttendanceSchema = z.object({
@@ -89,254 +68,67 @@ const markAttendanceSchema = z.object({
     attended: z.boolean(),
 });
 
-// ──────────────────────────────────────────────
-// MEETING CRUD
-// ──────────────────────────────────────────────
+const joinInviteSchema = z.object({
+    token: z.string().min(8),
+});
 
-/**
- * @route   POST /api/meetings
- * @desc    Create a new meeting
- */
+router.use(authenticate);
+
+router.get("/invites/:token/preview", ctrl.getInvitePreview);
+router.post("/join", validateBody(joinInviteSchema), ctrl.joinViaInvite);
+
 router.post(
     "/",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    requireTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.CREATE),
     validateBody(createMeetingSchema),
     auditLog({ action: AuditAction.CREATE, resource: "meetings" }),
     ctrl.create
 );
 
-/**
- * @route   GET /api/meetings
- * @desc    List meetings (query: organizationId, projectId)
- */
-router.get(
-    "/",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    requireTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.READ),
-    ctrl.list
-);
+router.get("/", ctrl.list);
+router.get("/:id", ctrl.getById);
 
-/**
- * @route   GET /api/meetings/:id
- * @desc    Get meeting details
- */
-router.get(
-    "/:id",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.READ),
-    ctrl.getById
-);
-
-/**
- * @route   PATCH /api/meetings/:id
- * @desc    Update meeting
- */
 router.patch(
     "/:id",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.UPDATE),
     validateBody(updateMeetingSchema),
     auditLog({ action: AuditAction.UPDATE, resource: "meetings" }),
     ctrl.update
 );
 
-/**
- * @route   PATCH /api/meetings/:id/status
- * @desc    Update meeting status
- */
 router.patch(
     "/:id/status",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.UPDATE),
     validateBody(updateStatusSchema),
-    auditLog({
-        action: AuditAction.UPDATE,
-        resource: "meetings",
-        getDescription: (req) => `Meeting status changed to ${req.body.status}`,
-    }),
     ctrl.updateStatus
 );
 
-// ──────────────────────────────────────────────
-// PARTICIPANTS
-// ──────────────────────────────────────────────
+router.post(
+    "/:id/invite-link",
+    ctrl.regenerateInvite
+);
 
-/**
- * @route   POST /api/meetings/:id/participants
- * @desc    Add participants to a meeting
- */
 router.post(
     "/:id/participants",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.UPDATE),
     validateBody(addParticipantsSchema),
     ctrl.addParticipants
 );
 
-/**
- * @route   DELETE /api/meetings/:id/participants/:userId
- * @desc    Remove a participant from a meeting
- */
-router.delete(
-    "/:id/participants/:userId",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.UPDATE),
-    ctrl.removeParticipant
-);
+router.delete("/:id/participants/:userId", ctrl.removeParticipant);
 
-/**
- * @route   PATCH /api/meetings/:id/attendance
- * @desc    Mark attendance for a participant
- */
 router.patch(
     "/:id/attendance",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.UPDATE),
     validateBody(markAttendanceSchema),
     ctrl.markAttendance
 );
 
-// ──────────────────────────────────────────────
-// NOTES
-// ──────────────────────────────────────────────
+router.post("/:id/notes", validateBody(addNoteSchema), ctrl.addNote);
+router.get("/:id/notes", ctrl.getNotes);
 
-/**
- * @route   POST /api/meetings/:id/notes
- * @desc    Add a note to a meeting
- */
-router.post(
-    "/:id/notes",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.UPDATE),
-    validateBody(addNoteSchema),
-    ctrl.addNote
-);
-
-/**
- * @route   GET /api/meetings/:id/notes
- * @desc    Get all notes for a meeting
- */
-router.get(
-    "/:id/notes",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.READ),
-    ctrl.getNotes
-);
-
-// ──────────────────────────────────────────────
-// MOM (Minutes of Meeting)
-// ──────────────────────────────────────────────
-
-/**
- * @route   POST /api/meetings/:id/mom/generate
- * @desc    Generate MOM for a meeting
- */
 router.post(
     "/:id/mom/generate",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.CREATE),
     validateBody(generateMomSchema),
     auditLog({ action: AuditAction.CREATE, resource: "minutes_of_meeting" }),
     ctrl.generateMom
 );
 
-/**
- * @route   GET /api/meetings/:id/mom
- * @desc    Get MOM for a meeting
- */
-router.get(
-    "/:id/mom",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.READ),
-    ctrl.getMom
-);
-
-/**
- * @route   PATCH /api/mom/:momId
- * @desc    Update MOM content
- */
-router.patch(
-    "/mom/:momId",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.UPDATE),
-    validateBody(updateMomSchema),
-    ctrl.updateMom
-);
-
-// ──────────────────────────────────────────────
-// ACTION ITEMS
-// ──────────────────────────────────────────────
-
-/**
- * @route   POST /api/mom/:momId/action-items
- * @desc    Add an action item to a MOM
- */
-router.post(
-    "/mom/:momId/action-items",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.CREATE),
-    validateBody(addActionItemSchema),
-    ctrl.addActionItem
-);
-
-/**
- * @route   PATCH /api/mom/action-items/:actionItemId
- * @desc    Update an action item
- */
-router.patch(
-    "/mom/action-items/:actionItemId",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.UPDATE),
-    validateBody(updateActionItemSchema),
-    ctrl.updateActionItem
-);
-
-/**
- * @route   POST /api/mom/action-items/:actionItemId/convert-to-task
- * @desc    Convert an action item into a Kanban task
- */
-router.post(
-    "/mom/action-items/:actionItemId/convert-to-task",
-    authenticate,
-    loadPermissions,
-    resolveTenant,
-    authorize(PermissionResource.MEETINGS, PermissionAction.CREATE),
-    validateBody(convertToTaskSchema),
-    auditLog({ action: AuditAction.CREATE, resource: "tasks", getDescription: () => "Converted MOM action item to task" }),
-    ctrl.convertToTask
-);
+router.get("/:id/mom", ctrl.getMom);
 
 export default router;

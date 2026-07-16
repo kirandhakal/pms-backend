@@ -1,11 +1,13 @@
+import crypto from "crypto";
 import { AppDataSource } from "../config/data-source";
-import { Meeting, MeetingStatus } from "../entities/Meeting";
+import { Meeting, MeetingStatus, MeetingVisibility } from "../entities/Meeting";
 import { MeetingParticipant } from "../entities/MeetingParticipant";
 import { MeetingNote } from "../entities/MeetingNote";
 import { MinutesOfMeeting } from "../entities/MinutesOfMeeting";
 import { MomActionItem, MomActionItemStatus } from "../entities/MomActionItem";
 import { Task, TaskStatus } from "../entities/Task";
 import { ApiError } from "../middlewares/errorHandler";
+import { channelService } from "./ChannelService";
 
 export class MeetingService {
     private meetingRepo = AppDataSource.getRepository(Meeting);
@@ -15,44 +17,61 @@ export class MeetingService {
     private actionItemRepo = AppDataSource.getRepository(MomActionItem);
     private taskRepo = AppDataSource.getRepository(Task);
 
-    // ─────────────────────────────────────
-    // MEETINGS
-    // ─────────────────────────────────────
+    private frontendBaseUrl() {
+        return (process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:3000").replace(
+            /\/$/,
+            ""
+        );
+    }
+
+    private makeInviteToken() {
+        return crypto.randomBytes(24).toString("hex");
+    }
 
     async createMeeting(data: {
-        organizationId: string;
+        organizationId?: string;
         projectId?: string;
         channelId?: string;
         title: string;
+        topic?: string;
         agenda?: string;
-        scheduledAt: Date;
+        scheduledAt: Date | string;
         durationMins?: number;
         createdById: string;
         participantIds?: string[];
+        visibility?: MeetingVisibility;
+        isPersonal?: boolean;
     }): Promise<Meeting> {
+        const isPersonal = data.isPersonal || !data.organizationId;
+        const visibility = data.visibility || MeetingVisibility.PRIVATE;
+        const inviteToken =
+            visibility === MeetingVisibility.PUBLIC ? this.makeInviteToken() : this.makeInviteToken();
+
         const meeting = this.meetingRepo.create({
-            organizationId: data.organizationId,
+            organizationId: isPersonal ? undefined : data.organizationId,
             projectId: data.projectId,
             channelId: data.channelId,
             title: data.title,
+            topic: data.topic || (data.projectId ? "project" : isPersonal ? "personal" : "general"),
             agenda: data.agenda,
-            scheduledAt: data.scheduledAt,
+            scheduledAt: new Date(data.scheduledAt),
             durationMins: data.durationMins ?? 30,
             createdById: data.createdById,
             status: MeetingStatus.SCHEDULED,
+            visibility,
+            inviteToken,
         });
 
         const saved = await this.meetingRepo.save(meeting);
 
-        // Add creator as organizer
-        const organizer = this.participantRepo.create({
-            meetingId: saved.id,
-            userId: data.createdById,
-            isOrganizer: true,
-        });
-        await this.participantRepo.save(organizer);
+        await this.participantRepo.save(
+            this.participantRepo.create({
+                meetingId: saved.id,
+                userId: data.createdById,
+                isOrganizer: true,
+            })
+        );
 
-        // Add participants
         if (data.participantIds?.length) {
             const participants = data.participantIds
                 .filter((id) => id !== data.createdById)
@@ -63,9 +82,7 @@ export class MeetingService {
                         isOrganizer: false,
                     })
                 );
-            if (participants.length) {
-                await this.participantRepo.save(participants);
-            }
+            if (participants.length) await this.participantRepo.save(participants);
         }
 
         return this.getMeetingById(saved.id) as Promise<Meeting>;
@@ -88,14 +105,71 @@ export class MeetingService {
         });
     }
 
-    async getMeetingsByOrganization(organizationId: string, projectId?: string): Promise<Meeting[]> {
-        const where: any = { organizationId };
-        if (projectId) where.projectId = projectId;
+    /**
+     * List meetings for org and/or personal scope with optional filters.
+     */
+    async listMeetings(filters: {
+        organizationId?: string;
+        projectId?: string;
+        topic?: string;
+        status?: MeetingStatus | "HISTORY" | "UPCOMING";
+        userId: string;
+        personalOnly?: boolean;
+    }): Promise<Meeting[]> {
+        const qb = this.meetingRepo
+            .createQueryBuilder("m")
+            .leftJoinAndSelect("m.participants", "p")
+            .leftJoinAndSelect("p.user", "pu")
+            .leftJoinAndSelect("m.createdBy", "creator")
+            .leftJoinAndSelect("m.project", "project")
+            .orderBy("m.scheduledAt", "DESC");
 
-        return this.meetingRepo.find({
-            where,
-            relations: ["participants", "participants.user", "createdBy", "project"],
-            order: { scheduledAt: "DESC" },
+        if (filters.personalOnly || (!filters.organizationId && filters.userId)) {
+            // Personal: created by user OR user is participant, no org
+            qb.andWhere("m.organizationId IS NULL").andWhere(
+                "(m.createdById = :userId OR p.userId = :userId)",
+                { userId: filters.userId }
+            );
+        } else if (filters.organizationId) {
+            qb.andWhere("m.organizationId = :organizationId", {
+                organizationId: filters.organizationId,
+            });
+        }
+
+        if (filters.projectId) {
+            qb.andWhere("m.projectId = :projectId", { projectId: filters.projectId });
+        }
+
+        if (filters.topic) {
+            if (filters.topic === "other") {
+                qb.andWhere("(m.topic IS NULL OR m.topic NOT IN (:...known))", {
+                    known: ["project", "personal", "standup", "planning", "general"],
+                });
+            } else {
+                qb.andWhere("m.topic = :topic", { topic: filters.topic });
+            }
+        }
+
+        if (filters.status === "HISTORY") {
+            qb.andWhere("m.status IN (:...statuses)", {
+                statuses: [MeetingStatus.COMPLETED, MeetingStatus.CANCELLED],
+            });
+        } else if (filters.status === "UPCOMING") {
+            qb.andWhere("m.status IN (:...statuses)", {
+                statuses: [MeetingStatus.SCHEDULED, MeetingStatus.IN_PROGRESS],
+            });
+        } else if (filters.status) {
+            qb.andWhere("m.status = :status", { status: filters.status });
+        }
+
+        return qb.getMany();
+    }
+
+    async getMeetingsByOrganization(organizationId: string, projectId?: string): Promise<Meeting[]> {
+        return this.listMeetings({
+            organizationId,
+            projectId,
+            userId: "", // unused when org set
         });
     }
 
@@ -103,17 +177,32 @@ export class MeetingService {
         id: string,
         data: Partial<{
             title: string;
+            topic: string;
             agenda: string;
-            scheduledAt: Date;
+            scheduledAt: Date | string;
             durationMins: number;
             channelId: string;
             projectId: string;
+            visibility: MeetingVisibility;
         }>
     ): Promise<Meeting> {
         const meeting = await this.meetingRepo.findOne({ where: { id } });
         if (!meeting) throw new ApiError("Meeting not found", 404);
 
-        Object.assign(meeting, data);
+        if (data.title !== undefined) meeting.title = data.title;
+        if (data.topic !== undefined) meeting.topic = data.topic;
+        if (data.agenda !== undefined) meeting.agenda = data.agenda;
+        if (data.scheduledAt !== undefined) meeting.scheduledAt = new Date(data.scheduledAt);
+        if (data.durationMins !== undefined) meeting.durationMins = data.durationMins;
+        if (data.channelId !== undefined) meeting.channelId = data.channelId;
+        if (data.projectId !== undefined) meeting.projectId = data.projectId;
+        if (data.visibility !== undefined) {
+            meeting.visibility = data.visibility;
+            if (data.visibility === MeetingVisibility.PUBLIC && !meeting.inviteToken) {
+                meeting.inviteToken = this.makeInviteToken();
+            }
+        }
+
         await this.meetingRepo.save(meeting);
         return this.getMeetingById(id) as Promise<Meeting>;
     }
@@ -122,7 +211,6 @@ export class MeetingService {
         const meeting = await this.meetingRepo.findOne({ where: { id } });
         if (!meeting) throw new ApiError("Meeting not found", 404);
 
-        // Validate status transitions
         const validTransitions: Record<MeetingStatus, MeetingStatus[]> = {
             [MeetingStatus.SCHEDULED]: [MeetingStatus.IN_PROGRESS, MeetingStatus.CANCELLED],
             [MeetingStatus.IN_PROGRESS]: [MeetingStatus.COMPLETED, MeetingStatus.CANCELLED],
@@ -131,10 +219,7 @@ export class MeetingService {
         };
 
         if (!validTransitions[meeting.status].includes(status)) {
-            throw new ApiError(
-                `Cannot transition from ${meeting.status} to ${status}`,
-                400
-            );
+            throw new ApiError(`Cannot transition from ${meeting.status} to ${status}`, 400);
         }
 
         meeting.status = status;
@@ -142,17 +227,71 @@ export class MeetingService {
         return this.getMeetingById(id) as Promise<Meeting>;
     }
 
-    // ─────────────────────────────────────
-    // PARTICIPANTS
-    // ─────────────────────────────────────
+    getInviteLink(meeting: Meeting): string | null {
+        if (!meeting.inviteToken) return null;
+        return `${this.frontendBaseUrl()}/meetings/join?token=${meeting.inviteToken}`;
+    }
+
+    async getMeetingByInviteToken(token: string): Promise<Meeting | null> {
+        return this.meetingRepo.findOne({
+            where: { inviteToken: token },
+            relations: ["participants", "participants.user", "createdBy", "project"],
+        });
+    }
+
+    /**
+     * Join via invite link. Public meetings allow anyone; private require existing invite/participant.
+     */
+    async joinViaInviteToken(userId: string, token: string): Promise<Meeting> {
+        const meeting = await this.getMeetingByInviteToken(token);
+        if (!meeting) throw new ApiError("Meeting invite not found", 404);
+
+        if (
+            meeting.status === MeetingStatus.COMPLETED ||
+            meeting.status === MeetingStatus.CANCELLED
+        ) {
+            throw new ApiError("This meeting has ended", 400);
+        }
+
+        const existing = await this.participantRepo.findOne({
+            where: { meetingId: meeting.id, userId },
+        });
+        if (existing) {
+            return this.getMeetingById(meeting.id) as Promise<Meeting>;
+        }
+
+        if (meeting.visibility !== MeetingVisibility.PUBLIC) {
+            throw new ApiError("This meeting is private. Ask the organizer to invite you.", 403);
+        }
+
+        await this.participantRepo.save(
+            this.participantRepo.create({
+                meetingId: meeting.id,
+                userId,
+                isOrganizer: false,
+            })
+        );
+
+        return this.getMeetingById(meeting.id) as Promise<Meeting>;
+    }
+
+    async regenerateInviteLink(meetingId: string, makePublic = true): Promise<{ inviteUrl: string; meeting: Meeting }> {
+        const meeting = await this.meetingRepo.findOne({ where: { id: meetingId } });
+        if (!meeting) throw new ApiError("Meeting not found", 404);
+
+        meeting.inviteToken = this.makeInviteToken();
+        if (makePublic) meeting.visibility = MeetingVisibility.PUBLIC;
+        await this.meetingRepo.save(meeting);
+
+        const full = (await this.getMeetingById(meetingId))!;
+        return { inviteUrl: this.getInviteLink(full)!, meeting: full };
+    }
 
     async addParticipants(meetingId: string, userIds: string[]): Promise<MeetingParticipant[]> {
         const meeting = await this.meetingRepo.findOne({ where: { id: meetingId } });
         if (!meeting) throw new ApiError("Meeting not found", 404);
 
-        const existing = await this.participantRepo.find({
-            where: { meetingId },
-        });
+        const existing = await this.participantRepo.find({ where: { meetingId } });
         const existingUserIds = new Set(existing.map((p) => p.userId));
 
         const newParticipants = userIds
@@ -186,19 +325,13 @@ export class MeetingService {
             where: { meetingId, userId },
         });
         if (!participant) throw new ApiError("Participant not found", 404);
-
         participant.attended = attended;
         return this.participantRepo.save(participant);
     }
 
-    // ─────────────────────────────────────
-    // NOTES
-    // ─────────────────────────────────────
-
     async addNote(meetingId: string, authorId: string, content: string): Promise<MeetingNote> {
         const meeting = await this.meetingRepo.findOne({ where: { id: meetingId } });
         if (!meeting) throw new ApiError("Meeting not found", 404);
-
         const note = this.noteRepo.create({ meetingId, authorId, content });
         return this.noteRepo.save(note);
     }
@@ -211,13 +344,6 @@ export class MeetingService {
         });
     }
 
-    // ─────────────────────────────────────
-    // MOM (Minutes of Meeting)
-    // ─────────────────────────────────────
-
-    /**
-     * Generate MOM from meeting notes (template-based v1)
-     */
     async generateMom(
         meetingId: string,
         generatedById: string,
@@ -229,6 +355,9 @@ export class MeetingService {
                 assigneeId?: string;
                 dueDate?: string;
             }>;
+            postToChannel?: boolean;
+            convertActionItemsToTasks?: boolean;
+            projectId?: string;
         }
     ): Promise<MinutesOfMeeting> {
         const meeting = await this.meetingRepo.findOne({
@@ -236,7 +365,9 @@ export class MeetingService {
             relations: ["mom"],
         });
         if (!meeting) throw new ApiError("Meeting not found", 404);
-        if (meeting.mom) throw new ApiError("MOM already exists for this meeting. Use update instead.", 409);
+        if (meeting.mom) {
+            throw new ApiError("MOM already exists for this meeting. Use update instead.", 409);
+        }
 
         const mom = this.momRepo.create({
             meetingId,
@@ -245,10 +376,8 @@ export class MeetingService {
             generatedById,
             isAutoDrafted: false,
         });
-
         const savedMom = await this.momRepo.save(mom);
 
-        // Create action items
         if (data.actionItems?.length) {
             const items = data.actionItems.map((item) =>
                 this.actionItemRepo.create({
@@ -260,6 +389,39 @@ export class MeetingService {
                 })
             );
             await this.actionItemRepo.save(items);
+
+            if (data.convertActionItemsToTasks && data.projectId) {
+                const created = await this.actionItemRepo.find({ where: { momId: savedMom.id } });
+                for (const item of created) {
+                    try {
+                        await this.convertActionItemToTask(item.id, data.projectId, generatedById);
+                    } catch {
+                        // skip
+                    }
+                }
+            }
+        }
+
+        const shouldPost = data.postToChannel !== false && meeting.channelId;
+        if (shouldPost && meeting.channelId) {
+            try {
+                const actionLines =
+                    data.actionItems?.map((a, i) => `${i + 1}. ${a.description}`).join("\n") ||
+                    "None";
+                const body = [
+                    `📋 **Minutes of Meeting: ${meeting.title}**`,
+                    "",
+                    `**Summary**`,
+                    data.summary,
+                    data.decisions ? `\n**Decisions**\n${data.decisions}` : "",
+                    `\n**Action Items**\n${actionLines}`,
+                ]
+                    .filter(Boolean)
+                    .join("\n");
+                await channelService.sendMessage(generatedById, meeting.channelId, body);
+            } catch (err) {
+                console.warn("MOM channel post skipped:", (err as Error).message);
+            }
         }
 
         return this.getMom(meetingId) as Promise<MinutesOfMeeting>;
@@ -278,14 +440,9 @@ export class MeetingService {
     ): Promise<MinutesOfMeeting> {
         const mom = await this.momRepo.findOne({ where: { id: momId } });
         if (!mom) throw new ApiError("MOM not found", 404);
-
         Object.assign(mom, data);
         return this.momRepo.save(mom);
     }
-
-    // ─────────────────────────────────────
-    // ACTION ITEMS
-    // ─────────────────────────────────────
 
     async addActionItem(
         momId: string,
@@ -293,7 +450,6 @@ export class MeetingService {
     ): Promise<MomActionItem> {
         const mom = await this.momRepo.findOne({ where: { id: momId } });
         if (!mom) throw new ApiError("MOM not found", 404);
-
         const item = this.actionItemRepo.create({
             momId,
             description: data.description,
@@ -315,14 +471,10 @@ export class MeetingService {
     ): Promise<MomActionItem> {
         const item = await this.actionItemRepo.findOne({ where: { id: actionItemId } });
         if (!item) throw new ApiError("Action item not found", 404);
-
         Object.assign(item, data);
         return this.actionItemRepo.save(item);
     }
 
-    /**
-     * Convert an action item into a Kanban Task
-     */
     async convertActionItemToTask(
         actionItemId: string,
         projectId: string,
@@ -337,7 +489,6 @@ export class MeetingService {
             throw new ApiError("Action item has already been converted to a task", 409);
         }
 
-        // Create task
         const task = this.taskRepo.create({
             name: item.description.slice(0, 255),
             description: `[From MOM] ${item.description}`,
@@ -347,13 +498,9 @@ export class MeetingService {
             createdById,
             dueDate: item.dueDate ? new Date(item.dueDate) : undefined,
         });
-
         const savedTask = await this.taskRepo.save(task);
-
-        // Link back
         item.convertedTaskId = savedTask.id;
         const updatedItem = await this.actionItemRepo.save(item);
-
         return { actionItem: updatedItem, task: savedTask };
     }
 }

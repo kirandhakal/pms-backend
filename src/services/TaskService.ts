@@ -5,6 +5,7 @@ import { Team } from "../entities/Team";
 import { User } from "../entities/User";
 import { ActivityAction } from "../entities/ActivityLog";
 import { ActivityLogService } from "./ActivityLogService";
+import { worklogService } from "./WorklogService";
 
 export class TaskService {
     private taskRepo = AppDataSource.getRepository(Task);
@@ -54,14 +55,33 @@ export class TaskService {
         });
         if (!task) throw new Error("Task not found");
 
+        const previousStatus = task.status;
         task.status = status;
         if (completion !== undefined) task.completionPercentage = completion;
         if (status === TaskStatus.DONE) {
             task.completedAt = new Date();
             task.completionPercentage = 100;
+        } else if (previousStatus === TaskStatus.DONE) {
+            task.completedAt = undefined;
+        }
+
+        if (status === TaskStatus.IN_PROGRESS && !task.startDate) {
+            task.startDate = new Date();
         }
 
         const savedTask = await this.taskRepo.save(task);
+
+        // Auto-worklog when status transitions to Done
+        if (status === TaskStatus.DONE && previousStatus !== TaskStatus.DONE) {
+            try {
+                await worklogService.createFromTaskCompletion(
+                    savedTask,
+                    actorId || savedTask.assigneeId
+                );
+            } catch (err) {
+                console.warn("Auto worklog creation skipped:", (err as Error).message);
+            }
+        }
 
         if (savedTask.team?.id) {
             await this.activityLogService.log({

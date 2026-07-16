@@ -2,6 +2,7 @@ import { AppDataSource } from "../config/data-source";
 import { TeamRole } from "../entities/TeamRole";
 import { TeamMembership } from "../entities/TeamMembership";
 import { Team } from "../entities/Team";
+import { User } from "../entities/User";
 import { ApiError } from "../middlewares/errorHandler";
 
 const DEFAULT_TEAM_ROLES = [
@@ -17,6 +18,7 @@ export class TeamRoleService {
     private roleRepo = AppDataSource.getRepository(TeamRole);
     private membershipRepo = AppDataSource.getRepository(TeamMembership);
     private teamRepo = AppDataSource.getRepository(Team);
+    private userRepo = AppDataSource.getRepository(User);
 
     /**
      * Get all team roles for an organization
@@ -99,9 +101,12 @@ export class TeamRoleService {
         // Check for existing membership
         const existing = await this.membershipRepo.findOne({
             where: { teamId, userId },
+            relations: ["user", "teamRole"],
         });
         if (existing) {
-            throw new ApiError("User is already a member of this team", 409);
+            existing.teamRoleId = teamRoleId;
+            existing.teamRole = role;
+            return this.membershipRepo.save(existing);
         }
 
         const membership = this.membershipRepo.create({
@@ -109,23 +114,33 @@ export class TeamRoleService {
             userId,
             teamRoleId,
         });
-        return this.membershipRepo.save(membership);
+        const saved = await this.membershipRepo.save(membership);
+        return this.membershipRepo.findOne({
+            where: { id: saved.id },
+            relations: ["user", "teamRole"],
+        }) as Promise<TeamMembership>;
     }
 
     /**
-     * Update a team member's role
+     * Update a team member's role (upsert — creates membership if missing)
      */
     async updateTeamMemberRole(teamId: string, userId: string, teamRoleId: string): Promise<TeamMembership> {
         const membership = await this.membershipRepo.findOne({
             where: { teamId, userId },
         });
-        if (!membership) throw new ApiError("Team membership not found", 404);
+        if (!membership) {
+            return this.addTeamMember(teamId, userId, teamRoleId);
+        }
 
         const role = await this.roleRepo.findOne({ where: { id: teamRoleId } });
         if (!role) throw new ApiError("Team role not found", 404);
 
         membership.teamRoleId = teamRoleId;
-        return this.membershipRepo.save(membership);
+        await this.membershipRepo.save(membership);
+        return this.membershipRepo.findOne({
+            where: { id: membership.id },
+            relations: ["user", "teamRole"],
+        }) as Promise<TeamMembership>;
     }
 
     /**
@@ -141,13 +156,45 @@ export class TeamRoleService {
     }
 
     /**
-     * Get all members of a team (with roles)
+     * Get all org/team users with their typed sub-role (left-join style).
+     * Users without a TeamMembership still appear so roles can be assigned.
      */
-    async getTeamMembers(teamId: string): Promise<TeamMembership[]> {
-        return this.membershipRepo.find({
+    async getTeamMembers(teamId: string): Promise<Array<TeamMembership | {
+        id: null;
+        teamId: string;
+        userId: string;
+        teamRoleId: null;
+        joinedAt: null;
+        user: User;
+        teamRole: null;
+    }>> {
+        const users = await this.userRepo.find({
+            where: { team: { id: teamId } },
+            select: ["id", "username", "fullName", "email"],
+            order: { fullName: "ASC" },
+        });
+
+        const memberships = await this.membershipRepo.find({
             where: { teamId },
             relations: ["user", "teamRole"],
-            order: { joinedAt: "ASC" },
+        });
+        const byUser = new Map(memberships.map((m) => [m.userId, m]));
+
+        return users.map((user) => {
+            const membership = byUser.get(user.id);
+            if (membership) {
+                membership.user = user;
+                return membership;
+            }
+            return {
+                id: null,
+                teamId,
+                userId: user.id,
+                teamRoleId: null,
+                joinedAt: null,
+                user,
+                teamRole: null,
+            };
         });
     }
 }

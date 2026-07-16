@@ -25,18 +25,24 @@ export enum MeetingStatus {
     CANCELLED = "CANCELLED",
 }
 
+export enum MeetingVisibility {
+    PRIVATE = "PRIVATE",
+    PUBLIC = "PUBLIC",
+}
+
 @Entity("meetings")
 export class Meeting {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
-    @ManyToOne(() => Organization, { onDelete: "CASCADE" })
+    /** Null for personal/individual meetings */
+    @ManyToOne(() => Organization, { onDelete: "CASCADE", nullable: true })
     @JoinColumn({ name: "organizationId" })
-    organization!: Organization;
+    organization?: Organization;
 
-    @Column()
+    @Column({ nullable: true })
     @Index()
-    organizationId!: string;
+    organizationId?: string;
 
     @ManyToOne(() => Project, { nullable: true, onDelete: "SET NULL" })
     @JoinColumn({ name: "projectId" })
@@ -56,6 +62,11 @@ export class Meeting {
     @Column({ length: 255 })
     title!: string;
 
+    /** Free-form topic for grouping (standup, planning, other…) */
+    @Column({ length: 100, nullable: true })
+    @Index()
+    topic?: string;
+
     @Column({ type: "text", nullable: true })
     agenda?: string;
 
@@ -67,6 +78,14 @@ export class Meeting {
 
     @Column({ type: "enum", enum: MeetingStatus, default: MeetingStatus.SCHEDULED })
     status!: MeetingStatus;
+
+    @Column({ type: "enum", enum: MeetingVisibility, default: MeetingVisibility.PRIVATE })
+    visibility!: MeetingVisibility;
+
+    /** Shareable join token — anyone with link can join if PUBLIC */
+    @Column({ unique: true, nullable: true })
+    @Index()
+    inviteToken?: string;
 
     @ManyToOne(() => User, { onDelete: "CASCADE" })
     @JoinColumn({ name: "createdById" })

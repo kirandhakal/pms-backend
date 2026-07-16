@@ -1,19 +1,23 @@
 import { Response } from "express";
 import { AuthRequest } from "../middlewares/auth";
 import { meetingService } from "../services/MeetingService";
-import { MeetingStatus } from "../entities/Meeting";
-import { MomActionItemStatus } from "../entities/MomActionItem";
+import { MeetingStatus, MeetingVisibility } from "../entities/Meeting";
 
 export class MeetingController {
-    // ─── MEETINGS ───────────────────────────────────
-
     async create(req: AuthRequest, res: Response) {
         try {
+            const isPersonal = !!req.body.isPersonal || !req.body.organizationId;
             const meeting = await meetingService.createMeeting({
                 ...req.body,
+                isPersonal,
                 createdById: req.user!.id,
             });
-            res.status(201).json({ message: "Meeting created", data: meeting });
+            const inviteUrl = meetingService.getInviteLink(meeting);
+            res.status(201).json({
+                message: "Meeting created",
+                data: meeting,
+                inviteUrl,
+            });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
         }
@@ -21,12 +25,25 @@ export class MeetingController {
 
     async list(req: AuthRequest, res: Response) {
         try {
-            const organizationId = String(req.query.organizationId || "");
+            const organizationId = req.query.organizationId
+                ? String(req.query.organizationId)
+                : undefined;
             const projectId = req.query.projectId ? String(req.query.projectId) : undefined;
-            const meetings = await meetingService.getMeetingsByOrganization(
+            const topic = req.query.topic ? String(req.query.topic) : undefined;
+            const status = req.query.status ? String(req.query.status) : undefined;
+            const personalOnly =
+                req.query.personal === "true" ||
+                req.query.personalOnly === "true" ||
+                (!organizationId && !!req.user?.id);
+
+            const meetings = await meetingService.listMeetings({
                 organizationId,
-                projectId
-            );
+                projectId,
+                topic,
+                status: status as any,
+                userId: req.user!.id,
+                personalOnly: personalOnly && !organizationId,
+            });
             res.json({ data: meetings });
         } catch (err: any) {
             res.status(err.statusCode || 500).json({ message: err.message });
@@ -39,7 +56,10 @@ export class MeetingController {
             if (!meeting) {
                 return res.status(404).json({ message: "Meeting not found" });
             }
-            res.json({ data: meeting });
+            res.json({
+                data: meeting,
+                inviteUrl: meetingService.getInviteLink(meeting),
+            });
         } catch (err: any) {
             res.status(err.statusCode || 500).json({ message: err.message });
         }
@@ -48,7 +68,11 @@ export class MeetingController {
     async update(req: AuthRequest, res: Response) {
         try {
             const meeting = await meetingService.updateMeeting(String(req.params.id), req.body);
-            res.json({ message: "Meeting updated", data: meeting });
+            res.json({
+                message: "Meeting updated",
+                data: meeting,
+                inviteUrl: meetingService.getInviteLink(meeting),
+            });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
         }
@@ -67,8 +91,6 @@ export class MeetingController {
         }
     }
 
-    // ─── PARTICIPANTS ───────────────────────────────
-
     async addParticipants(req: AuthRequest, res: Response) {
         try {
             const { userIds } = req.body;
@@ -84,7 +106,10 @@ export class MeetingController {
 
     async removeParticipant(req: AuthRequest, res: Response) {
         try {
-            await meetingService.removeParticipant(String(req.params.id), String(req.params.userId));
+            await meetingService.removeParticipant(
+                String(req.params.id),
+                String(req.params.userId)
+            );
             res.json({ message: "Participant removed" });
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
@@ -104,8 +129,6 @@ export class MeetingController {
             res.status(err.statusCode || 400).json({ message: err.message });
         }
     }
-
-    // ─── NOTES ──────────────────────────────────────
 
     async addNote(req: AuthRequest, res: Response) {
         try {
@@ -128,8 +151,6 @@ export class MeetingController {
             res.status(err.statusCode || 500).json({ message: err.message });
         }
     }
-
-    // ─── MOM ────────────────────────────────────────
 
     async generateMom(req: AuthRequest, res: Response) {
         try {
@@ -165,8 +186,6 @@ export class MeetingController {
         }
     }
 
-    // ─── ACTION ITEMS ───────────────────────────────
-
     async addActionItem(req: AuthRequest, res: Response) {
         try {
             const item = await meetingService.addActionItem(String(req.params.momId), req.body);
@@ -200,6 +219,58 @@ export class MeetingController {
                 message: "Action item converted to task",
                 data: result,
             });
+        } catch (err: any) {
+            res.status(err.statusCode || 400).json({ message: err.message });
+        }
+    }
+
+    async getInvitePreview(req: AuthRequest, res: Response) {
+        try {
+            const token = String(req.params.token || req.query.token || "");
+            const meeting = await meetingService.getMeetingByInviteToken(token);
+            if (!meeting) {
+                return res.status(404).json({ message: "Invite not found" });
+            }
+            res.json({
+                data: {
+                    id: meeting.id,
+                    title: meeting.title,
+                    topic: meeting.topic,
+                    scheduledAt: meeting.scheduledAt,
+                    status: meeting.status,
+                    visibility: meeting.visibility,
+                    organizer: meeting.createdBy
+                        ? {
+                              id: meeting.createdBy.id,
+                              fullName: meeting.createdBy.fullName,
+                          }
+                        : null,
+                    canJoinPublicly: meeting.visibility === MeetingVisibility.PUBLIC,
+                },
+            });
+        } catch (err: any) {
+            res.status(err.statusCode || 400).json({ message: err.message });
+        }
+    }
+
+    async joinViaInvite(req: AuthRequest, res: Response) {
+        try {
+            const token = String(req.body.token || req.params.token || "");
+            const meeting = await meetingService.joinViaInviteToken(req.user!.id, token);
+            res.json({ message: "Joined meeting", data: meeting });
+        } catch (err: any) {
+            res.status(err.statusCode || 400).json({ message: err.message });
+        }
+    }
+
+    async regenerateInvite(req: AuthRequest, res: Response) {
+        try {
+            const makePublic = req.body?.makePublic !== false;
+            const result = await meetingService.regenerateInviteLink(
+                String(req.params.id),
+                makePublic
+            );
+            res.json(result);
         } catch (err: any) {
             res.status(err.statusCode || 400).json({ message: err.message });
         }

@@ -165,7 +165,7 @@ export class WorkflowEngine {
     async getWorkflowById(workflowId: string): Promise<Workflow | null> {
         return this.workflowRepo.findOne({
             where: { id: workflowId },
-            relations: ["stages"],
+            relations: ["stages", "stages.stageMembers"],
             order: { stages: { order: "ASC" } }
         });
     }

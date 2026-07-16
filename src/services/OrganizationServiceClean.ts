@@ -13,6 +13,7 @@ import { PermissionService } from "./PermissionService";
 import { Role } from "../entities/Role";
 import { Organization } from "../entities/Organization";
 import { OrgMemberRole, UserOrganization } from "../entities/UserOrganization";
+import { teamRoleService } from "./TeamRoleService";
 
 export class OrganizationService {
     private teamRepo = AppDataSource.getRepository(Team);
@@ -95,6 +96,13 @@ export class OrganizationService {
             details: `${actor.fullName} created organization ${savedTeam.name}`
         });
 
+        // Seed default team sub-roles (Frontend, Backend, QA, etc.)
+        try {
+            await teamRoleService.seedDefaultRoles(savedTeam.id);
+        } catch (err) {
+            console.warn("Team role seed skipped:", (err as Error).message);
+        }
+
         return savedTeam;
     }
 
@@ -141,8 +149,324 @@ export class OrganizationService {
         return savedUser;
     }
 
-    async inviteMember(actorId: string, teamId: string, email: string, role: UserRole) {
+    private frontendBaseUrl() {
+        return (process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:3000").replace(/\/$/, "");
+    }
+
+    private sanitizePermissions(permissions?: string[]): PermissionKey[] {
+        if (!Array.isArray(permissions)) return [];
+        return Array.from(
+            new Set(
+                permissions.filter((p): p is PermissionKey =>
+                    Object.values(PermissionKey).includes(p as PermissionKey)
+                )
+            )
+        );
+    }
+
+    private async applyPermissions(
+        actorId: string,
+        teamId: string,
+        memberId: string,
+        permissions: PermissionKey[]
+    ) {
+        await this.permissionRepo.delete({ team: { id: teamId } as any, user: { id: memberId } as any });
+        if (permissions.length === 0) return;
+        const rows = permissions.map((permission) =>
+            this.permissionRepo.create({
+                team: { id: teamId } as Team,
+                user: { id: memberId } as User,
+                grantedBy: { id: actorId } as User,
+                permission,
+            })
+        );
+        await this.permissionRepo.save(rows);
+    }
+
+    /**
+     * Search platform users by username / name / email to add to the org.
+     * Excludes users already in this organization.
+     */
+    async searchUsersForOrg(actorId: string, teamId: string, query: string) {
+        await this.ensureMemberManager(actorId, teamId);
+        const trimmed = query.trim();
+        if (!trimmed) return [];
+
+        const users = await this.userRepo.find({
+            where: [
+                { username: ILike(`%${trimmed}%`) },
+                { fullName: ILike(`%${trimmed}%`) },
+                { email: ILike(`%${trimmed}%`) },
+            ],
+            take: 25,
+            select: ["id", "username", "fullName", "email"],
+        });
+
+        const results = [];
+        for (const u of users) {
+            if (u.id === actorId) continue;
+            const membership = await this.userOrganizationRepo.findOne({
+                where: { userId: u.id, organizationId: teamId },
+            });
+            if (membership) continue;
+            // Also skip if user.team points at this org
+            const full = await this.userRepo.findOne({
+                where: { id: u.id },
+                relations: ["team"],
+                select: ["id", "username", "fullName", "email"],
+            });
+            if (full?.team?.id === teamId) continue;
+
+            results.push({
+                id: u.id,
+                username: u.username,
+                fullName: u.fullName,
+                email: u.email,
+            });
+            if (results.length >= 15) break;
+        }
+        return results;
+    }
+
+    /**
+     * Add an existing platform user to the organization with role + permissions.
+     */
+    async addExistingUser(
+        actorId: string,
+        teamId: string,
+        userId: string,
+        role: UserRole = UserRole.MEMBER,
+        permissions: PermissionKey[] = [],
+        teamRoleId?: string
+    ) {
         const actor = await this.ensureMemberManager(actorId, teamId);
+        this.ensureCreatorCanAssignSensitivePermissions(actor, permissions);
+
+        const team = await this.teamRepo.findOne({ where: { id: teamId } });
+        if (!team) throw new Error("Organization not found");
+
+        const user = await this.userRepo.findOne({ where: { id: userId }, relations: ["team"] });
+        if (!user) throw new Error("User not found");
+
+        const existingMembership = await this.userOrganizationRepo.findOne({
+            where: { userId, organizationId: teamId },
+        });
+        if (existingMembership) throw new Error("User is already a member of this organization");
+
+        user.team = team;
+        user.organizationId = team.id;
+        if (user.legacyRole !== UserRole.SUPER_ADMIN && user.legacyRole !== UserRole.SUDO_ADMIN) {
+            user.legacyRole = role;
+        }
+        const savedUser = await this.userRepo.save(user);
+
+        await this.userOrganizationRepo.save(
+            this.userOrganizationRepo.create({
+                userId: savedUser.id,
+                organizationId: team.id,
+                role:
+                    role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN
+                        ? OrgMemberRole.ADMIN
+                        : OrgMemberRole.MEMBER,
+            })
+        );
+
+        const validPermissions = this.sanitizePermissions(permissions);
+        if (validPermissions.length > 0) {
+            await this.applyPermissions(actorId, teamId, savedUser.id, validPermissions);
+        }
+
+        if (teamRoleId) {
+            try {
+                await teamRoleService.addTeamMember(teamId, savedUser.id, teamRoleId);
+            } catch {
+                // optional sub-role
+            }
+        }
+
+        await this.activityLogService.log({
+            action: ActivityAction.MEMBER_ADDED,
+            actorId,
+            targetUserId: savedUser.id,
+            teamId,
+            details: `${savedUser.fullName || savedUser.username} added with role ${role}`,
+        });
+
+        return savedUser;
+    }
+
+    /**
+     * Create a shareable invite link. Anyone with the link can join
+     * and receives the preconfigured role + permissions.
+     */
+    async createInviteLink(
+        actorId: string,
+        teamId: string,
+        options: {
+            role?: UserRole;
+            permissions?: PermissionKey[];
+            teamRoleId?: string;
+            expiresInHours?: number;
+        } = {}
+    ) {
+        const actor = await this.ensureMemberManager(actorId, teamId);
+        const permissions = this.sanitizePermissions(options.permissions);
+        this.ensureCreatorCanAssignSensitivePermissions(actor, permissions);
+
+        const role = options.role || UserRole.MEMBER;
+        const token = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + (options.expiresInHours ?? 168)); // 7 days default
+
+        const roleEntity = await this.roleRepo.findOne({ where: { name: role } as any });
+        const invite = this.inviteRepo.create({
+            email: `link-invite+${token.slice(0, 8)}@invite.local`,
+            token,
+            organizationId: teamId,
+            role: roleEntity ?? undefined,
+            roleId: roleEntity?.id,
+            expiresAt,
+            status: "pending" as any,
+            type: "organization" as any,
+            invitedBy: { id: actor.id } as User,
+            metadata: {
+                isLinkInvite: true,
+                permissions,
+                legacyRole: role,
+                teamRoleId: options.teamRoleId,
+            },
+        });
+
+        await this.inviteRepo.save(invite);
+        await this.activityLogService.log({
+            action: ActivityAction.MEMBER_INVITED,
+            actorId,
+            teamId,
+            details: `Invite link created with role ${role}`,
+        });
+
+        const inviteUrl = `${this.frontendBaseUrl()}/join?token=${token}`;
+        return { token, inviteUrl, expiresAt, role, permissions };
+    }
+
+    /**
+     * Join organization via invite token (email invite or shareable link).
+     */
+    async joinViaInviteToken(actorId: string, token: string) {
+        const invite = await this.inviteRepo.findOne({
+            where: { token, status: "pending" as any },
+        });
+        if (!invite) throw new Error("Invitation not found or already used");
+        if (invite.expiresAt < new Date()) {
+            invite.status = "expired" as any;
+            await this.inviteRepo.save(invite);
+            throw new Error("Invitation has expired");
+        }
+
+        const teamId = invite.organizationId;
+        const team = await this.teamRepo.findOne({ where: { id: teamId } });
+        if (!team) throw new Error("Organization not found");
+
+        const user = await this.userRepo.findOne({ where: { id: actorId }, relations: ["team"] });
+        if (!user) throw new Error("User not found");
+
+        const existingMembership = await this.userOrganizationRepo.findOne({
+            where: { userId: actorId, organizationId: teamId },
+        });
+        if (existingMembership) {
+            throw new Error("You are already a member of this organization");
+        }
+
+        const legacyRole = (invite.metadata?.legacyRole as UserRole) || UserRole.MEMBER;
+        const permissions = this.sanitizePermissions(invite.metadata?.permissions);
+
+        user.team = team;
+        user.organizationId = team.id;
+        if (user.legacyRole !== UserRole.SUPER_ADMIN && user.legacyRole !== UserRole.SUDO_ADMIN) {
+            user.legacyRole = legacyRole;
+        }
+        const savedUser = await this.userRepo.save(user);
+
+        await this.userOrganizationRepo.save(
+            this.userOrganizationRepo.create({
+                userId: savedUser.id,
+                organizationId: team.id,
+                role:
+                    legacyRole === UserRole.ADMIN || legacyRole === UserRole.SUPER_ADMIN
+                        ? OrgMemberRole.ADMIN
+                        : OrgMemberRole.MEMBER,
+            })
+        );
+
+        if (permissions.length > 0 && invite.invitedById) {
+            await this.applyPermissions(invite.invitedById, teamId, savedUser.id, permissions);
+        }
+
+        if (invite.metadata?.teamRoleId) {
+            try {
+                await teamRoleService.addTeamMember(teamId, savedUser.id, invite.metadata.teamRoleId);
+            } catch {
+                // optional
+            }
+        }
+
+        // Link invites can be reused; email invites are single-use
+        if (!invite.metadata?.isLinkInvite) {
+            invite.status = "accepted" as any;
+        }
+        invite.metadata = {
+            ...invite.metadata,
+            acceptedAt: new Date(),
+            acceptedByUserId: actorId,
+        };
+        await this.inviteRepo.save(invite);
+
+        await this.activityLogService.log({
+            action: ActivityAction.MEMBER_JOINED,
+            actorId,
+            targetUserId: actorId,
+            teamId,
+            details: `${savedUser.fullName || savedUser.username} joined via invite`,
+        });
+
+        return { user: savedUser, organization: team, permissions };
+    }
+
+    async getInvitePreview(token: string) {
+        const invite = await this.inviteRepo.findOne({
+            where: { token },
+            relations: ["organization"],
+        });
+        if (!invite) throw new Error("Invitation not found");
+        if (invite.status !== ("pending" as any)) throw new Error("Invitation is no longer valid");
+        if (invite.expiresAt < new Date()) throw new Error("Invitation has expired");
+
+        const org =
+            invite.organization ||
+            (await this.organizationRepo.findOne({ where: { id: invite.organizationId } }));
+
+        return {
+            organizationId: invite.organizationId,
+            organizationName: org?.name || "Organization",
+            role: invite.metadata?.legacyRole || "MEMBER",
+            permissions: invite.metadata?.permissions || [],
+            isLinkInvite: !!invite.metadata?.isLinkInvite,
+            expiresAt: invite.expiresAt,
+        };
+    }
+
+    async inviteMember(
+        actorId: string,
+        teamId: string,
+        email: string,
+        role: UserRole,
+        permissions: PermissionKey[] = [],
+        teamRoleId?: string
+    ) {
+        const actor = await this.ensureMemberManager(actorId, teamId);
+        const validPermissions = this.sanitizePermissions(permissions);
+        this.ensureCreatorCanAssignSensitivePermissions(actor, validPermissions);
+
         const token = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 48);
@@ -157,13 +481,25 @@ export class OrganizationService {
             expiresAt,
             status: "pending" as any,
             type: "organization" as any,
-            invitedBy: { id: actor.id } as User
+            invitedBy: { id: actor.id } as User,
+            metadata: {
+                isLinkInvite: false,
+                permissions: validPermissions,
+                legacyRole: role,
+                teamRoleId,
+            },
         });
 
         await this.inviteRepo.save(invite);
-        await this.activityLogService.log({ action: ActivityAction.MEMBER_INVITED, actorId, teamId, details: `Invitation sent to ${email} with role ${role}` });
+        await this.activityLogService.log({
+            action: ActivityAction.MEMBER_INVITED,
+            actorId,
+            teamId,
+            details: `Invitation sent to ${email} with role ${role}`,
+        });
 
-        return { token, inviteUrl: `http://localhost:3000/register?token=${token}&email=${encodeURIComponent(email)}`, emailSent: false };
+        const inviteUrl = `${this.frontendBaseUrl()}/join?token=${token}&email=${encodeURIComponent(email)}`;
+        return { token, inviteUrl, emailSent: false, permissions: validPermissions };
     }
 
     async addMemberManually(actorId: string, teamId: string, name: string, email: string, role: UserRole) {

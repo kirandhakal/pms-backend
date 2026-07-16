@@ -7,7 +7,7 @@ import { Team } from "../entities/Team";
 import { workflowEngine } from "./WorkflowEngine";
 import { ensureOrganizationForTeam } from "../utils/organization-bridge";
 import { ApiError } from "../middlewares/errorHandler";
-import { ProjectRole, PROJECT_ROLE } from "../constants/workflow-stages";
+import { ProjectRole, PROJECT_ROLE, canViewStage } from "../constants/workflow-stages";
 
 export interface CreateProjectDTO {
     name: string;
@@ -175,10 +175,28 @@ export class ProjectService {
             viewerRole = roleMap[member.role] || viewerRole;
         }
 
-        const visibleStages = await workflowEngine.getVisibleStages(
+        // Elevated roles (org creator / PM / team lead) see all stages
+        const isElevated =
+            viewerRole === "ORG_CREATOR" ||
+            viewerRole === "PROJECT_MANAGER" ||
+            viewerRole === "TEAM_LEAD";
+
+        // New per-stage visibility (TEAM_ONLY | PROJECT_WIDE + stage members)
+        let visibleStages = await workflowEngine.getVisibleStagesForUser(
             project.workflowId,
-            viewerRole
+            userId,
+            isElevated
         );
+
+        // Also apply legacy role-category visibility for non-elevated viewers
+        if (!isElevated) {
+            visibleStages = visibleStages.filter((stage) =>
+                canViewStage(
+                    { category: stage.settings?.category, settings: stage.settings },
+                    viewerRole
+                )
+            );
+        }
 
         return {
             project,
