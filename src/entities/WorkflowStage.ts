@@ -1,9 +1,9 @@
-import { 
-    Entity, 
-    PrimaryGeneratedColumn, 
-    Column, 
-    CreateDateColumn, 
-    UpdateDateColumn, 
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    UpdateDateColumn,
     ManyToOne,
     OneToMany,
     JoinColumn,
@@ -11,6 +11,12 @@ import {
 } from "typeorm";
 import { Workflow } from "./Workflow";
 import { Task } from "./Task";
+import { WorkflowStageMember } from "./WorkflowStageMember";
+
+export enum StageVisibility {
+    TEAM_ONLY = "TEAM_ONLY",
+    PROJECT_WIDE = "PROJECT_WIDE",
+}
 
 export interface StageSettings {
     autoAssignTo?: string;
@@ -66,6 +72,12 @@ export class WorkflowStage {
 
     @Column({ type: "jsonb", nullable: true })
     settings?: StageSettings;
+
+    @Column({ type: "enum", enum: StageVisibility, default: StageVisibility.PROJECT_WIDE })
+    visibility!: StageVisibility;
+
+    @OneToMany(() => WorkflowStageMember, (m) => m.stage, { cascade: true })
+    stageMembers!: WorkflowStageMember[];
 
     @Column({ default: true })
     isActive!: boolean;

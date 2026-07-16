@@ -17,7 +17,9 @@ export enum PermissionResource {
     SETTINGS = "settings",
     AUDIT_LOGS = "audit_logs",
     DASHBOARD = "dashboard",
-    REPORTS = "reports"
+    REPORTS = "reports",
+    MEETINGS = "meetings",
+    TEAMS = "teams",
 }
 
 export enum PermissionAction {
@@ -189,7 +191,7 @@ export function stringToPermission(permString: string): Permission | null {
     if (parts.length !== 3) return null;
 
     const [resource, action, scope] = parts;
-    
+
     if (!Object.values(PermissionResource).includes(resource as PermissionResource)) return null;
     if (!Object.values(PermissionAction).includes(action as PermissionAction)) return null;
     if (!Object.values(PermissionScope).includes(scope as PermissionScope)) return null;
