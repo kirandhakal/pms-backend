@@ -8,16 +8,29 @@ export class AuthService {
     private userRepo = AppDataSource.getRepository(User);
     private sessionRepo = AppDataSource.getRepository(Session);
 
-    async register(data: { fullName: string; email: string; password: string }) {
+    async register(data: { fullName: string; email: string; password: string; username?: string }) {
         const normalizedEmail = data.email.trim().toLowerCase();
         const existing = await this.userRepo.findOne({ where: { email: normalizedEmail } });
         if (existing) {
             throw new ApiError("Email is already in use", 409);
         }
 
+        // Generate username if not provided
+        let username = data.username?.trim().toLowerCase();
+        if (!username) {
+            username = normalizedEmail.split("@")[0] + Math.floor(Math.random() * 1000);
+        }
+
+        // Check username uniqueness
+        const existingUsername = await this.userRepo.findOne({ where: { username } });
+        if (existingUsername) {
+            throw new ApiError("Username is already taken", 409);
+        }
+
         const user = this.userRepo.create({
             fullName: data.fullName,
             email: normalizedEmail,
+            username,
             password: await hashPassword(data.password),
             legacyRole: UserRole.USER,
             isActive: true
@@ -27,6 +40,7 @@ export class AuthService {
         return {
             id: saved.id,
             fullName: saved.fullName,
+            username: saved.username,
             email: saved.email,
             legacyRole: saved.legacyRole,
             isActive: saved.isActive,
@@ -40,7 +54,7 @@ export class AuthService {
         const user = await this.userRepo.findOne({
             where: { email: normalizedEmail },
             relations: ["team"],
-            select: ["id", "password", "legacyRole", "fullName", "email", "isActive"]
+            select: ["id", "password", "legacyRole", "fullName", "username", "email", "avatarUrl", "organizationId", "isActive"]
         });
 
         if (!user || !(await comparePassword(password, user.password))) {
@@ -66,8 +80,11 @@ export class AuthService {
             user: {
                 id: user.id,
                 fullName: user.fullName,
+                username: (user as any).username,
                 email: user.email,
                 legacyRole: user.legacyRole,
+                avatarUrl: (user as any).avatarUrl,
+                organizationId: (user as any).organizationId,
                 team: user.team ? { id: user.team.id, name: user.team.name } : undefined,
                 isActive: user.isActive
             }
@@ -83,16 +100,30 @@ export class AuthService {
     }
 
     async getCurrentUser(userId: string) {
-        const user = await this.userRepo.findOne({ where: { id: userId }, relations: ["team"] });
+        const user = await this.userRepo.findOne({
+            where: { id: userId },
+            relations: ["team", "userOrganizations", "userOrganizations.organization"]
+        });
         if (!user) {
             throw new ApiError("User not found", 404);
         }
 
+        const organizations = (user.userOrganizations ?? []).map((membership) => ({
+            id: membership.organization?.id ?? membership.organizationId,
+            name: membership.organization?.name ?? "",
+            slug: membership.organization?.slug ?? "",
+            role: membership.role
+        }));
+
         return {
             id: user.id,
             fullName: user.fullName,
+            username: user.username,
             email: user.email,
             legacyRole: user.legacyRole,
+            avatarUrl: user.avatarUrl,
+            organizationId: user.organizationId,
+            organizations,
             team: user.team ? { id: user.team.id, name: user.team.name } : undefined,
             isActive: user.isActive,
             createdAt: user.createdAt,

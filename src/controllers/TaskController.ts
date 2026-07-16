@@ -22,7 +22,12 @@ export class TaskController {
                 return res.status(400).json({ message: "taskId is required" });
             }
             const { status, completion } = req.body;
-            const updated = await taskService.updateTaskStatus(taskIdParam, status as TaskStatus, completion);
+            const updated = await taskService.updateTaskStatus(
+                taskIdParam,
+                status as TaskStatus,
+                completion,
+                req.user?.id
+            );
             res.json(updated);
         } catch (err: any) {
             res.status(400).json({ message: err.message });

@@ -16,6 +16,7 @@ const Department_1 = require("./Department");
 const Role_1 = require("./Role");
 const Project_1 = require("./Project");
 const Task_1 = require("./Task");
+const UserOrganization_1 = require("./UserOrganization");
 var OAuthProvider;
 (function (OAuthProvider) {
     OAuthProvider["GOOGLE"] = "google";
@@ -52,6 +53,11 @@ __decorate([
     (0, typeorm_1.Column)({ name: "name" }),
     __metadata("design:type", String)
 ], User.prototype, "fullName", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ unique: true, nullable: true }),
+    (0, typeorm_1.Index)(),
+    __metadata("design:type", String)
+], User.prototype, "username", void 0);
 __decorate([
     (0, typeorm_1.Column)({ unique: true }),
     (0, typeorm_1.Index)(),
@@ -139,6 +145,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => Task_1.Task, (task) => task.assignedUser),
     __metadata("design:type", Array)
 ], User.prototype, "assignedTasks", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => UserOrganization_1.UserOrganization, (userOrganization) => userOrganization.user),
+    __metadata("design:type", Array)
+], User.prototype, "userOrganizations", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

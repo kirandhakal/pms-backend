@@ -1,9 +1,12 @@
 import { AppDataSource } from "../config/data-source";
 import { Workflow, WorkflowSettings, WorkflowTransition } from "../entities/Workflow";
-import { WorkflowStage, StageSettings } from "../entities/WorkflowStage";
+import { WorkflowStage, StageSettings, StageVisibility } from "../entities/WorkflowStage";
+import { WorkflowStageMember } from "../entities/WorkflowStageMember";
 import { Task, TaskStatus } from "../entities/Task";
 import { TaskActivity, TaskActivityType } from "../entities/TaskActivity";
 import { ApiError } from "../middlewares/errorHandler";
+import { PROJECT_WORKFLOW_STAGES, canViewStage, ProjectRole } from "../constants/workflow-stages";
+import { worklogService } from "./WorklogService";
 
 export interface StageTransitionResult {
     success: boolean;
@@ -27,6 +30,7 @@ export interface CreateWorkflowDTO {
         isFinal?: boolean;
         settings?: StageSettings;
     }>;
+    isDefault?: boolean;
 }
 
 /**
@@ -52,6 +56,7 @@ export const DEFAULT_WORKFLOW_STAGES = [
 export class WorkflowEngine {
     private workflowRepo = AppDataSource.getRepository(Workflow);
     private stageRepo = AppDataSource.getRepository(WorkflowStage);
+    private stageMemberRepo = AppDataSource.getRepository(WorkflowStageMember);
     private taskRepo = AppDataSource.getRepository(Task);
     private activityRepo = AppDataSource.getRepository(TaskActivity);
 
@@ -69,7 +74,7 @@ export class WorkflowEngine {
                 requireAssignee: false,
                 notifyOnStageChange: true
             },
-            isDefault: false,
+            isDefault: data.isDefault ?? false,
             isActive: true
         });
 
@@ -77,7 +82,7 @@ export class WorkflowEngine {
 
         // Create stages
         const stagesData = data.stages?.length ? data.stages : DEFAULT_WORKFLOW_STAGES;
-        
+
         const stages = stagesData.map((stage, index) => {
             return this.stageRepo.create({
                 name: stage.name,
@@ -102,12 +107,65 @@ export class WorkflowEngine {
     }
 
     /**
+     * Create a project-specific workflow with role-based stage visibility
+     */
+    async createProjectWorkflow(
+        projectName: string,
+        organizationId: string,
+        createdById?: string
+    ): Promise<Workflow> {
+        const stages = PROJECT_WORKFLOW_STAGES.map((stage) => ({
+            name: stage.name,
+            order: stage.order,
+            color: stage.color,
+            isDefault: stage.isDefault,
+            isFinal: stage.isFinal,
+            settings: {
+                category: stage.category,
+                assignedRole: stage.assignedRole,
+                visibleToRoles: stage.visibleToRoles,
+            },
+        }));
+
+        return this.createWorkflow({
+            name: `${projectName} Workflow`,
+            description: `Auto-generated workflow for ${projectName}`,
+            organizationId,
+            createdById,
+            isDefault: false,
+            settings: {
+                allowBackwardTransition: true,
+                requireAssignee: false,
+                notifyOnStageChange: true,
+            },
+            stages,
+        });
+    }
+
+    /**
+     * Filter workflow stages by viewer's project role
+     */
+    async getVisibleStages(workflowId: string, viewerRole: ProjectRole): Promise<WorkflowStage[]> {
+        const workflow = await this.getWorkflowById(workflowId);
+        if (!workflow) {
+            throw new ApiError("Workflow not found", 404);
+        }
+
+        return workflow.stages.filter((stage) =>
+            canViewStage(
+                { category: stage.settings?.category, settings: stage.settings },
+                viewerRole
+            )
+        );
+    }
+
+    /**
      * Get workflow with stages
      */
     async getWorkflowById(workflowId: string): Promise<Workflow | null> {
         return this.workflowRepo.findOne({
             where: { id: workflowId },
-            relations: ["stages"],
+            relations: ["stages", "stages.stageMembers"],
             order: { stages: { order: "ASC" } }
         });
     }
@@ -174,7 +232,7 @@ export class WorkflowEngine {
 
         // Determine order
         const maxOrder = Math.max(...workflow.stages.map(s => s.order), -1);
-        
+
         const stage = this.stageRepo.create({
             name: data.name,
             order: data.order ?? maxOrder + 1,
@@ -199,7 +257,7 @@ export class WorkflowEngine {
         isFinal: boolean;
     }>): Promise<WorkflowStage> {
         const stage = await this.stageRepo.findOne({ where: { id: stageId } });
-        
+
         if (!stage) {
             throw new ApiError("Stage not found", 404);
         }
@@ -244,9 +302,9 @@ export class WorkflowEngine {
      */
     async reorderStages(workflowId: string, stageOrders: Array<{ id: string; order: number }>): Promise<WorkflowStage[]> {
         const stages = await this.stageRepo.find({ where: { workflowId } });
-        
+
         const orderMap = new Map(stageOrders.map(s => [s.id, s.order]));
-        
+
         for (const stage of stages) {
             if (orderMap.has(stage.id)) {
                 stage.order = orderMap.get(stage.id)!;
@@ -274,7 +332,7 @@ export class WorkflowEngine {
         }
 
         const toStage = await this.stageRepo.findOne({ where: { id: toStageId } });
-        
+
         if (!toStage) {
             throw new ApiError("Target stage not found", 404);
         }
@@ -282,7 +340,7 @@ export class WorkflowEngine {
         // Validate transition
         const fromStage = task.stage!;
         const isValidTransition = await this.validateTransition(task.workflow!, fromStage, toStage);
-        
+
         if (!isValidTransition) {
             throw new ApiError(`Cannot transition from "${fromStage.name}" to "${toStage.name}"`, 400);
         }
@@ -312,6 +370,15 @@ export class WorkflowEngine {
 
         // Execute onEnter hook for new stage
         await this.executeOnEnter(savedTask, toStage);
+
+        // Auto-generate worklog when task reaches final stage
+        if (toStage.isFinal) {
+            try {
+                await worklogService.createFromTaskCompletion(savedTask, userId);
+            } catch (err) {
+                console.warn("Auto worklog creation skipped:", (err as Error).message);
+            }
+        }
 
         // Log activity
         const activity = this.activityRepo.create({
@@ -350,11 +417,11 @@ export class WorkflowEngine {
         if (!workflow.transitions?.length) {
             // By default, allow forward and backward if configured
             const allowBackward = workflow.settings?.allowBackwardTransition ?? true;
-            
+
             if (!allowBackward && toStage.order < fromStage.order) {
                 return false;
             }
-            
+
             return true;
         }
 
@@ -427,7 +494,7 @@ export class WorkflowEngine {
         avgTimeInStage?: number;
     }[]> {
         const workflow = await this.getWorkflowById(workflowId);
-        
+
         if (!workflow) {
             throw new ApiError("Workflow not found", 404);
         }
@@ -449,6 +516,111 @@ export class WorkflowEngine {
         );
 
         return stats;
+    }
+
+    // ─────────────────────────────────────────────────
+    // STAGE VISIBILITY & MEMBER MANAGEMENT
+    // ─────────────────────────────────────────────────
+
+    /**
+     * Update stage visibility (TEAM_ONLY | PROJECT_WIDE)
+     */
+    async updateStageVisibility(
+        stageId: string,
+        visibility: StageVisibility
+    ): Promise<WorkflowStage> {
+        const stage = await this.stageRepo.findOne({ where: { id: stageId } });
+        if (!stage) throw new ApiError("Stage not found", 404);
+
+        stage.visibility = visibility;
+        return this.stageRepo.save(stage);
+    }
+
+    /**
+     * Add member(s) to a stage (for TEAM_ONLY visibility)
+     */
+    async addStageMembers(stageId: string, userIds: string[]): Promise<WorkflowStageMember[]> {
+        const stage = await this.stageRepo.findOne({ where: { id: stageId } });
+        if (!stage) throw new ApiError("Stage not found", 404);
+
+        const existing = await this.stageMemberRepo.find({ where: { stageId } });
+        const existingSet = new Set(existing.map((m) => m.userId));
+
+        const newMembers = userIds
+            .filter((id) => !existingSet.has(id))
+            .map((userId) => this.stageMemberRepo.create({ stageId, userId }));
+
+        if (newMembers.length === 0) return existing;
+        const saved = await this.stageMemberRepo.save(newMembers);
+        return [...existing, ...saved];
+    }
+
+    /**
+     * Remove a member from a stage
+     */
+    async removeStageMember(stageId: string, userId: string): Promise<void> {
+        const member = await this.stageMemberRepo.findOne({
+            where: { stageId, userId },
+        });
+        if (!member) throw new ApiError("Stage member not found", 404);
+        await this.stageMemberRepo.remove(member);
+    }
+
+    /**
+     * List members of a stage
+     */
+    async getStageMembers(stageId: string): Promise<WorkflowStageMember[]> {
+        return this.stageMemberRepo.find({
+            where: { stageId },
+            relations: ["user"],
+        });
+    }
+
+    /**
+     * Check if a user can view a stage based on visibility rules.
+     * canViewStageForUser(userId, stage) =
+     *   user.roleLevel IN (TEAM_LEAD, PROJECT_MANAGER, ORG_CREATOR)
+     *   OR stage.visibility == PROJECT_WIDE
+     *   OR user.id IN stage.members
+     */
+    async canUserViewStage(userId: string, stageId: string, isElevatedRole: boolean): Promise<boolean> {
+        if (isElevatedRole) return true;
+
+        const stage = await this.stageRepo.findOne({ where: { id: stageId } });
+        if (!stage) return false;
+
+        if (stage.visibility === StageVisibility.PROJECT_WIDE) return true;
+
+        // TEAM_ONLY — check membership
+        const member = await this.stageMemberRepo.findOne({
+            where: { stageId, userId },
+        });
+        return !!member;
+    }
+
+    /**
+     * Filter stages of a workflow based on user visibility.
+     * Returns only visually accessible stages for the user.
+     */
+    async getVisibleStagesForUser(
+        workflowId: string,
+        userId: string,
+        isElevatedRole: boolean
+    ): Promise<WorkflowStage[]> {
+        const workflow = await this.workflowRepo.findOne({
+            where: { id: workflowId },
+            relations: ["stages", "stages.stageMembers"],
+            order: { stages: { order: "ASC" } },
+        });
+        if (!workflow) throw new ApiError("Workflow not found", 404);
+
+        if (isElevatedRole) return workflow.stages;
+
+        return workflow.stages.filter((stage) => {
+            if (stage.visibility === StageVisibility.PROJECT_WIDE) return true;
+            // TEAM_ONLY — check if user is in stage members
+            return stage.stageMembers?.some((m) => m.userId === userId);
+        });
     }
 }
 

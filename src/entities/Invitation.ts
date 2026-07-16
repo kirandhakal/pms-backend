@@ -89,6 +89,13 @@ export class Invitation {
         lastResentAt?: Date;
         acceptedAt?: Date;
         acceptedByUserId?: string;
+        /** Org permissions to grant on accept */
+        permissions?: string[];
+        /** Legacy role string to assign */
+        legacyRole?: string;
+        /** Shareable link invite (no specific email required) */
+        isLinkInvite?: boolean;
+        teamRoleId?: string;
     };
 
     @CreateDateColumn()

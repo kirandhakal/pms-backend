@@ -1,9 +1,9 @@
-import { 
-    Entity, 
-    PrimaryGeneratedColumn, 
-    Column, 
-    CreateDateColumn, 
-    UpdateDateColumn, 
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    UpdateDateColumn,
     ManyToOne,
     OneToMany,
     JoinColumn,
@@ -11,16 +11,25 @@ import {
 } from "typeorm";
 import { Workflow } from "./Workflow";
 import { Task } from "./Task";
+import { WorkflowStageMember } from "./WorkflowStageMember";
+
+export enum StageVisibility {
+    TEAM_ONLY = "TEAM_ONLY",
+    PROJECT_WIDE = "PROJECT_WIDE",
+}
 
 export interface StageSettings {
-    autoAssignTo?: string;       // User ID for auto-assignment
+    autoAssignTo?: string;
     requireApproval?: boolean;
     approverRoles?: string[];
-    maxWipLimit?: number;        // Max work in progress
-    slaHours?: number;           // SLA in hours
+    maxWipLimit?: number;
+    slaHours?: number;
     notifyOnEntry?: boolean;
     notifyOnExit?: boolean;
     webhookUrl?: string;
+    category?: string;
+    assignedRole?: string;
+    visibleToRoles?: string[];
 }
 
 @Entity("workflow_stages")
@@ -63,6 +72,12 @@ export class WorkflowStage {
 
     @Column({ type: "jsonb", nullable: true })
     settings?: StageSettings;
+
+    @Column({ type: "enum", enum: StageVisibility, default: StageVisibility.PROJECT_WIDE })
+    visibility!: StageVisibility;
+
+    @OneToMany(() => WorkflowStageMember, (m) => m.stage, { cascade: true })
+    stageMembers!: WorkflowStageMember[];
 
     @Column({ default: true })
     isActive!: boolean;

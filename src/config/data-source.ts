@@ -16,6 +16,24 @@ import { AuditLog } from "../entities/AuditLog";
 import { ActivityLog } from "../entities/ActivityLog";
 import { TaskActivity } from "../entities/TaskActivity";
 import { TaskComment } from "../entities/TaskComment";
+import { Worklog } from "../entities/Worklog";
+import { Channel } from "../entities/Channel";
+import { ChannelMember } from "../entities/ChannelMember";
+import { ChannelMessage } from "../entities/ChannelMessage";
+import { Friendship } from "../entities/Friendship";
+import { DirectMessage } from "../entities/DirectMessage";
+import { ProjectMember } from "../entities/ProjectMember";
+import { OrganizationPermission } from "../entities/OrganizationPermission";
+import { UserOrganization } from "../entities/UserOrganization";
+// New entities
+import { TeamRole } from "../entities/TeamRole";
+import { TeamMembership } from "../entities/TeamMembership";
+import { WorkflowStageMember } from "../entities/WorkflowStageMember";
+import { Meeting } from "../entities/Meeting";
+import { MeetingParticipant } from "../entities/MeetingParticipant";
+import { MeetingNote } from "../entities/MeetingNote";
+import { MinutesOfMeeting } from "../entities/MinutesOfMeeting";
+import { MomActionItem } from "../entities/MomActionItem";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -44,11 +62,11 @@ export const AppDataSource = new DataSource({
     synchronize: nodeEnv === "development",
     logging: nodeEnv === "development",
     entities: [
-        User, 
-        Team, 
-        Project, 
-        Task, 
-        Invitation, 
+        User,
+        Team,
+        Project,
+        Task,
+        Invitation,
         Session,
         Organization,
         Department,
@@ -59,7 +77,25 @@ export const AppDataSource = new DataSource({
         AuditLog,
         ActivityLog,
         TaskActivity,
-        TaskComment
+        TaskComment,
+        Worklog,
+        Channel,
+        ChannelMember,
+        ChannelMessage,
+        Friendship,
+        DirectMessage,
+        ProjectMember,
+        OrganizationPermission,
+        UserOrganization,
+        // New entities
+        TeamRole,
+        TeamMembership,
+        WorkflowStageMember,
+        Meeting,
+        MeetingParticipant,
+        MeetingNote,
+        MinutesOfMeeting,
+        MomActionItem,
     ],
     migrations: [],
     subscribers: [],

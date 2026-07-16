@@ -17,7 +17,9 @@ export enum PermissionResource {
     SETTINGS = "settings",
     AUDIT_LOGS = "audit_logs",
     DASHBOARD = "dashboard",
-    REPORTS = "reports"
+    REPORTS = "reports",
+    MEETINGS = "meetings",
+    TEAMS = "teams",
 }
 
 export enum PermissionAction {
@@ -99,6 +101,8 @@ export const DefaultRolePermissions: Record<SystemRoleName, Permission[]> = {
         { resource: PermissionResource.AUDIT_LOGS, action: PermissionAction.READ, scope: PermissionScope.SYSTEM },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.SYSTEM },
         { resource: PermissionResource.REPORTS, action: PermissionAction.EXPORT, scope: PermissionScope.SYSTEM },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.SYSTEM },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.MANAGE, scope: PermissionScope.SYSTEM },
     ],
 
     SUPER_ADMIN: [
@@ -116,6 +120,8 @@ export const DefaultRolePermissions: Record<SystemRoleName, Permission[]> = {
         { resource: PermissionResource.AUDIT_LOGS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.REPORTS, action: PermissionAction.EXPORT, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
     ],
 
     ADMIN: [
@@ -131,6 +137,8 @@ export const DefaultRolePermissions: Record<SystemRoleName, Permission[]> = {
         { resource: PermissionResource.ROLES, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.SETTINGS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
     ],
 
     DEPARTMENT_HEAD: [
@@ -145,6 +153,8 @@ export const DefaultRolePermissions: Record<SystemRoleName, Permission[]> = {
         { resource: PermissionResource.INVITATIONS, action: PermissionAction.CREATE, scope: PermissionScope.DEPARTMENT },
         { resource: PermissionResource.INVITATIONS, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
     ],
 
     MANAGER: [
@@ -155,6 +165,8 @@ export const DefaultRolePermissions: Record<SystemRoleName, Permission[]> = {
         { resource: PermissionResource.WORKFLOWS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.TASKS, action: PermissionAction.MANAGE, scope: PermissionScope.DEPARTMENT },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
     ],
 
     MEMBER: [
@@ -166,11 +178,16 @@ export const DefaultRolePermissions: Record<SystemRoleName, Permission[]> = {
         { resource: PermissionResource.TASKS, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
         { resource: PermissionResource.TASKS, action: PermissionAction.UPDATE, scope: PermissionScope.OWN },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.OWN },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.CREATE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.UPDATE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
     ],
 
     GUEST: [
         // Read-only access to public kanban
         { resource: PermissionResource.TASKS, action: PermissionAction.READ, scope: PermissionScope.OWN },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
     ]
 };
 
@@ -189,7 +206,7 @@ export function stringToPermission(permString: string): Permission | null {
     if (parts.length !== 3) return null;
 
     const [resource, action, scope] = parts;
-    
+
     if (!Object.values(PermissionResource).includes(resource as PermissionResource)) return null;
     if (!Object.values(PermissionAction).includes(action as PermissionAction)) return null;
     if (!Object.values(PermissionScope).includes(scope as PermissionScope)) return null;
