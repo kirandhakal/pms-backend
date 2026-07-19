@@ -3,6 +3,16 @@ import { Worklog } from "../entities/Worklog";
 import { Task } from "../entities/Task";
 import { WorkflowStage } from "../entities/WorkflowStage";
 import { TaskActivity, TaskActivityType } from "../entities/TaskActivity";
+import { ApiError } from "../middlewares/errorHandler";
+
+export interface WorklogFilter {
+    organizationId?: string;
+    departmentId?: string;
+    userId?: string;
+    projectId?: string;
+    from?: string;
+    to?: string;
+}
 
 export class WorklogService {
     private worklogRepo = AppDataSource.getRepository(Worklog);
@@ -129,6 +139,98 @@ export class WorklogService {
             relations: ["project", "task"],
             order: { logDate: "DESC", createdAt: "DESC" },
         });
+    }
+
+    /**
+     * Called from the completion modal — ensures the auto worklog exists,
+     * then applies the employee-confirmed hours and "other work" note.
+     */
+    async confirmCompletion(data: {
+        taskId: string;
+        userId?: string;
+        hours?: number;
+        otherWork?: string;
+        description?: string;
+    }): Promise<Worklog> {
+        const task = await AppDataSource.getRepository(Task).findOne({
+            where: { id: data.taskId },
+        });
+        if (!task) {
+            throw new ApiError("Task not found", 404);
+        }
+
+        let worklog = await this.createFromTaskCompletion(task, data.userId);
+        if (!worklog) {
+            throw new ApiError("Unable to create worklog: task has no assignee", 400);
+        }
+
+        if (data.hours != null) worklog.hours = data.hours;
+        if (data.otherWork !== undefined) worklog.otherWork = data.otherWork;
+        if (data.description) worklog.description = data.description;
+        worklog.confirmed = true;
+
+        return this.worklogRepo.save(worklog);
+    }
+
+    /**
+     * Owner-only edit of a worklog.
+     */
+    async updateWorklog(
+        id: string,
+        data: { hours?: number; description?: string; otherWork?: string },
+        requesterId: string
+    ): Promise<Worklog> {
+        const worklog = await this.worklogRepo.findOne({ where: { id } });
+        if (!worklog) {
+            throw new ApiError("Worklog not found", 404);
+        }
+        if (worklog.userId !== requesterId) {
+            throw new ApiError("You can only edit your own worklogs", 403);
+        }
+
+        if (data.hours != null) worklog.hours = data.hours;
+        if (data.description !== undefined) worklog.description = data.description;
+        if (data.otherWork !== undefined) worklog.otherWork = data.otherWork;
+
+        return this.worklogRepo.save(worklog);
+    }
+
+    /**
+     * Management listing scoped by organization/department with optional filters.
+     */
+    async listForManagement(filter: WorklogFilter): Promise<Worklog[]> {
+        const qb = this.worklogRepo
+            .createQueryBuilder("worklog")
+            .leftJoinAndSelect("worklog.user", "user")
+            .leftJoinAndSelect("worklog.project", "project")
+            .leftJoinAndSelect("worklog.task", "task")
+            .orderBy("worklog.logDate", "DESC")
+            .addOrderBy("worklog.createdAt", "DESC");
+
+        if (filter.organizationId) {
+            qb.andWhere("user.organizationId = :organizationId", {
+                organizationId: filter.organizationId,
+            });
+        }
+        if (filter.departmentId) {
+            qb.andWhere("user.departmentId = :departmentId", {
+                departmentId: filter.departmentId,
+            });
+        }
+        if (filter.userId) {
+            qb.andWhere("worklog.userId = :userId", { userId: filter.userId });
+        }
+        if (filter.projectId) {
+            qb.andWhere("worklog.projectId = :projectId", { projectId: filter.projectId });
+        }
+        if (filter.from) {
+            qb.andWhere("worklog.logDate >= :from", { from: filter.from });
+        }
+        if (filter.to) {
+            qb.andWhere("worklog.logDate <= :to", { to: filter.to });
+        }
+
+        return qb.getMany();
     }
 }
 
