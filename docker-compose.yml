@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:17.0
+    container_name: pms-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: pmstool
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    ports:
+      - '5433:5432'  # Host port 5433 maps to container port 5432 (5432 already in use on host)
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d pmstool']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pms-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pms-backend
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: 123456
+      DATABASE_NAME: pmstool
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pms-network
+
+networks:
+  pms-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
