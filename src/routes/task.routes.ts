@@ -10,6 +10,9 @@ router.use(authenticate);
 
 router.post("/", authorizeRoles(UserRole.ADMIN, UserRole.SUPER_ADMIN), taskController.create);
 router.patch("/:taskId/status", taskController.updateStatus);
+router.post("/:taskId/transition", taskController.transitionStage);
+router.post("/:taskId/mark-live", taskController.markLive);
+router.post("/:taskId/rebug", taskController.rebug);
 
 // Progress tracking
 router.get("/progress/my", taskController.getMyProgress);

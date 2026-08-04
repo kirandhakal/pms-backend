@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PROJECT_WORKFLOW_STAGES = exports.ELEVATED_PROJECT_ROLES = exports.PROJECT_ROLE = void 0;
 exports.canViewStage = canViewStage;
+exports.canDragStage = canDragStage;
 exports.PROJECT_ROLE = {
     ORG_CREATOR: "ORG_CREATOR",
     PROJECT_MANAGER: "PROJECT_MANAGER",
@@ -103,4 +104,24 @@ function canViewStage(stage, viewerRole) {
         return true;
     }
     return false;
+}
+/** Dev/Frontend/Backend can only drag development stages; Tester → testing; etc. */
+function canDragStage(stage, actorRole) {
+    if (exports.ELEVATED_PROJECT_ROLES.includes(actorRole)) {
+        return true;
+    }
+    const category = stage.settings?.category || stage.category;
+    const assignedRole = stage.settings?.assignedRole || stage.assignedRole;
+    const roleCategory = {
+        [exports.PROJECT_ROLE.FRONTEND]: "development",
+        [exports.PROJECT_ROLE.BACKEND]: "development",
+        [exports.PROJECT_ROLE.MEMBER]: "development",
+        [exports.PROJECT_ROLE.TESTER]: "testing",
+        [exports.PROJECT_ROLE.DEVOPS]: "devops",
+        [exports.PROJECT_ROLE.PM]: "backlog",
+    };
+    if (assignedRole && assignedRole === actorRole) {
+        return true;
+    }
+    return roleCategory[actorRole] !== undefined && roleCategory[actorRole] === category;
 }

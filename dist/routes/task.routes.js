@@ -9,6 +9,9 @@ const taskController = new TaskController_1.TaskController();
 router.use(auth_1.authenticate);
 router.post("/", (0, auth_1.authorizeRoles)(User_1.UserRole.ADMIN, User_1.UserRole.SUPER_ADMIN), taskController.create);
 router.patch("/:taskId/status", taskController.updateStatus);
+router.post("/:taskId/transition", taskController.transitionStage);
+router.post("/:taskId/mark-live", taskController.markLive);
+router.post("/:taskId/rebug", taskController.rebug);
 // Progress tracking
 router.get("/progress/my", taskController.getMyProgress);
 router.get("/progress/:userId", (0, auth_1.authorizeRoles)(User_1.UserRole.ADMIN, User_1.UserRole.SUPER_ADMIN), taskController.getIndividualProgress);

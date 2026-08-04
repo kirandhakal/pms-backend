@@ -9,10 +9,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WorkflowStage = void 0;
+exports.WorkflowStage = exports.StageVisibility = void 0;
 const typeorm_1 = require("typeorm");
 const Workflow_1 = require("./Workflow");
 const Task_1 = require("./Task");
+const WorkflowStageMember_1 = require("./WorkflowStageMember");
+var StageVisibility;
+(function (StageVisibility) {
+    StageVisibility["TEAM_ONLY"] = "TEAM_ONLY";
+    StageVisibility["PROJECT_WIDE"] = "PROJECT_WIDE";
+})(StageVisibility || (exports.StageVisibility = StageVisibility = {}));
 let WorkflowStage = class WorkflowStage {
 };
 exports.WorkflowStage = WorkflowStage;
@@ -68,6 +74,14 @@ __decorate([
     (0, typeorm_1.Column)({ type: "jsonb", nullable: true }),
     __metadata("design:type", Object)
 ], WorkflowStage.prototype, "settings", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "enum", enum: StageVisibility, default: StageVisibility.PROJECT_WIDE }),
+    __metadata("design:type", String)
+], WorkflowStage.prototype, "visibility", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => WorkflowStageMember_1.WorkflowStageMember, (m) => m.stage, { cascade: true }),
+    __metadata("design:type", Array)
+], WorkflowStage.prototype, "stageMembers", void 0);
 __decorate([
     (0, typeorm_1.Column)({ default: true }),
     __metadata("design:type", Boolean)

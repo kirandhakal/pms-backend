@@ -25,6 +25,8 @@ var PermissionResource;
     PermissionResource["AUDIT_LOGS"] = "audit_logs";
     PermissionResource["DASHBOARD"] = "dashboard";
     PermissionResource["REPORTS"] = "reports";
+    PermissionResource["MEETINGS"] = "meetings";
+    PermissionResource["TEAMS"] = "teams";
 })(PermissionResource || (exports.PermissionResource = PermissionResource = {}));
 var PermissionAction;
 (function (PermissionAction) {
@@ -88,6 +90,8 @@ exports.DefaultRolePermissions = {
         { resource: PermissionResource.AUDIT_LOGS, action: PermissionAction.READ, scope: PermissionScope.SYSTEM },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.SYSTEM },
         { resource: PermissionResource.REPORTS, action: PermissionAction.EXPORT, scope: PermissionScope.SYSTEM },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.SYSTEM },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.MANAGE, scope: PermissionScope.SYSTEM },
     ],
     SUPER_ADMIN: [
         // Multi-organization management
@@ -104,6 +108,8 @@ exports.DefaultRolePermissions = {
         { resource: PermissionResource.AUDIT_LOGS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.REPORTS, action: PermissionAction.EXPORT, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
     ],
     ADMIN: [
         // Organization-level control
@@ -118,6 +124,10 @@ exports.DefaultRolePermissions = {
         { resource: PermissionResource.ROLES, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.SETTINGS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.REPORTS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.REPORTS, action: PermissionAction.EXPORT, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
     ],
     DEPARTMENT_HEAD: [
         // Department management
@@ -131,6 +141,10 @@ exports.DefaultRolePermissions = {
         { resource: PermissionResource.INVITATIONS, action: PermissionAction.CREATE, scope: PermissionScope.DEPARTMENT },
         { resource: PermissionResource.INVITATIONS, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
+        { resource: PermissionResource.REPORTS, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
+        { resource: PermissionResource.REPORTS, action: PermissionAction.EXPORT, scope: PermissionScope.DEPARTMENT },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
     ],
     MANAGER: [
         // Team/project management
@@ -140,6 +154,10 @@ exports.DefaultRolePermissions = {
         { resource: PermissionResource.WORKFLOWS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
         { resource: PermissionResource.TASKS, action: PermissionAction.MANAGE, scope: PermissionScope.DEPARTMENT },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
+        { resource: PermissionResource.REPORTS, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
+        { resource: PermissionResource.REPORTS, action: PermissionAction.EXPORT, scope: PermissionScope.DEPARTMENT },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.MANAGE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
     ],
     MEMBER: [
         // Task execution
@@ -150,10 +168,15 @@ exports.DefaultRolePermissions = {
         { resource: PermissionResource.TASKS, action: PermissionAction.READ, scope: PermissionScope.DEPARTMENT },
         { resource: PermissionResource.TASKS, action: PermissionAction.UPDATE, scope: PermissionScope.OWN },
         { resource: PermissionResource.DASHBOARD, action: PermissionAction.READ, scope: PermissionScope.OWN },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.CREATE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.UPDATE, scope: PermissionScope.ORGANIZATION },
+        { resource: PermissionResource.TEAMS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
     ],
     GUEST: [
         // Read-only access to public kanban
         { resource: PermissionResource.TASKS, action: PermissionAction.READ, scope: PermissionScope.OWN },
+        { resource: PermissionResource.MEETINGS, action: PermissionAction.READ, scope: PermissionScope.ORGANIZATION },
     ]
 };
 /**

@@ -5,8 +5,9 @@ import { WorkflowStageMember } from "../entities/WorkflowStageMember";
 import { Task, TaskStatus } from "../entities/Task";
 import { TaskActivity, TaskActivityType } from "../entities/TaskActivity";
 import { ApiError } from "../middlewares/errorHandler";
-import { PROJECT_WORKFLOW_STAGES, canViewStage, ProjectRole } from "../constants/workflow-stages";
+import { PROJECT_WORKFLOW_STAGES, canViewStage, canDragStage, ProjectRole, ELEVATED_PROJECT_ROLES, PROJECT_ROLE } from "../constants/workflow-stages";
 import { worklogService } from "./WorklogService";
+import { ProjectMember, ProjectMemberRole } from "../entities/ProjectMember";
 
 export interface StageTransitionResult {
     success: boolean;
@@ -320,7 +321,8 @@ export class WorkflowEngine {
     async transitionTask(
         taskId: string,
         toStageId: string,
-        userId?: string
+        userId?: string,
+        actorRole?: ProjectRole
     ): Promise<StageTransitionResult> {
         const task = await this.taskRepo.findOne({
             where: { id: taskId },
@@ -345,6 +347,32 @@ export class WorkflowEngine {
             throw new ApiError(`Cannot transition from "${fromStage.name}" to "${toStage.name}"`, 400);
         }
 
+        // Role-based drag: non-elevated actors may only move stages in their team category
+        if (actorRole && !canDragStage(
+            {
+                category: fromStage.settings?.category,
+                settings: fromStage.settings,
+            },
+            actorRole
+        )) {
+            throw new ApiError(
+                `Role ${actorRole} cannot drag tasks from stage "${fromStage.name}"`,
+                403
+            );
+        }
+        if (actorRole && !canDragStage(
+            {
+                category: toStage.settings?.category,
+                settings: toStage.settings,
+            },
+            actorRole
+        ) && !ELEVATED_PROJECT_ROLES.includes(actorRole)) {
+            throw new ApiError(
+                `Role ${actorRole} cannot drop tasks onto stage "${toStage.name}"`,
+                403
+            );
+        }
+
         // Execute onExit hook for current stage
         await this.executeOnExit(task, fromStage);
 
@@ -364,6 +392,31 @@ export class WorkflowEngine {
         } else {
             task.status = TaskStatus.IN_PROGRESS;
             task.completedAt = undefined;
+        }
+
+        // QA / tester send-back → development: persist sprint return ledger
+        const fromCategory = (fromStage.settings?.category || "").toLowerCase();
+        const toCategory = (toStage.settings?.category || "").toLowerCase();
+        const isSendBackToDev =
+            toCategory === "development" &&
+            (fromCategory === "testing" || fromCategory === "qa" || fromCategory === "devops");
+        if (isSendBackToDev) {
+            const meta = { ...(task.metadata || {}) };
+            meta.qaReturnCount = (meta.qaReturnCount || 0) + 1;
+            meta.qaReturns = [
+                ...(meta.qaReturns || []),
+                {
+                    fromStageId: oldStageId,
+                    fromStageName: fromStage.name,
+                    toStageId,
+                    toStageName: toStage.name,
+                    at: new Date().toISOString(),
+                    by: userId,
+                    returnedTo: "developer",
+                },
+            ];
+            meta.live = false;
+            task.metadata = meta;
         }
 
         const savedTask = await this.taskRepo.save(task);
@@ -403,6 +456,101 @@ export class WorkflowEngine {
             toStage,
             activity: savedActivity
         };
+    }
+
+    /**
+     * Resolve the caller's project role for drag ACL (falls back to MEMBER).
+     */
+    async resolveActorRole(userId: string, projectId?: string): Promise<ProjectRole> {
+        if (!projectId) return PROJECT_ROLE.MEMBER;
+
+        const memberRepo = AppDataSource.getRepository(ProjectMember);
+        const member = await memberRepo.findOne({ where: { projectId, userId } });
+        if (!member) return PROJECT_ROLE.MEMBER;
+
+        const map: Record<string, ProjectRole> = {
+            [ProjectMemberRole.PROJECT_MANAGER]: PROJECT_ROLE.PROJECT_MANAGER,
+            [ProjectMemberRole.TEAM_LEAD]: PROJECT_ROLE.TEAM_LEAD,
+            [ProjectMemberRole.FRONTEND]: PROJECT_ROLE.FRONTEND,
+            [ProjectMemberRole.BACKEND]: PROJECT_ROLE.BACKEND,
+            [ProjectMemberRole.TESTER]: PROJECT_ROLE.TESTER,
+            [ProjectMemberRole.DEVOPS]: PROJECT_ROLE.DEVOPS,
+            [ProjectMemberRole.MEMBER]: PROJECT_ROLE.MEMBER,
+        };
+        return map[member.role] || PROJECT_ROLE.MEMBER;
+    }
+
+    /**
+     * Mark a completed task as live (released).
+     */
+    async markLive(taskId: string, userId?: string): Promise<Task> {
+        const task = await this.taskRepo.findOne({ where: { id: taskId } });
+        if (!task) throw new ApiError("Task not found", 404);
+        if (task.status !== TaskStatus.DONE) {
+            throw new ApiError("Only completed tasks can be marked live", 400);
+        }
+
+        const meta = { ...(task.metadata || {}) };
+        meta.live = true;
+        meta.liveAt = new Date().toISOString();
+        task.metadata = meta;
+        const saved = await this.taskRepo.save(task);
+
+        await this.activityRepo.save(
+            this.activityRepo.create({
+                taskId,
+                userId,
+                type: TaskActivityType.UPDATED,
+                description: "Marked live",
+                details: { fieldName: "live", newValue: true },
+            })
+        );
+
+        return saved;
+    }
+
+    /**
+     * Rebug a live/completed task: send back to first development stage, +1 rebug.
+     */
+    async rebug(taskId: string, reason: string, userId?: string): Promise<StageTransitionResult> {
+        const task = await this.taskRepo.findOne({
+            where: { id: taskId },
+            relations: ["workflow", "workflow.stages", "stage"],
+        });
+        if (!task) throw new ApiError("Task not found", 404);
+        if (!task.metadata?.live && task.status !== TaskStatus.DONE) {
+            throw new ApiError("Only live or completed tasks can be rebuged", 400);
+        }
+        if (!task.workflowId) {
+            throw new ApiError("Task has no workflow", 400);
+        }
+
+        const stages = (task.workflow?.stages || []).slice().sort((a, b) => a.order - b.order);
+        const devStage =
+            stages.find((s) => (s.settings?.category || "").toLowerCase() === "development") ||
+            stages.find((s) => !s.isDefault && !s.isFinal);
+
+        if (!devStage) {
+            throw new ApiError("No development stage found for rebug", 400);
+        }
+
+        const meta = { ...(task.metadata || {}) };
+        meta.rebugCount = (meta.rebugCount || 0) + 1;
+        meta.live = false;
+        task.metadata = meta;
+        await this.taskRepo.save(task);
+
+        const actorRole = userId
+            ? await this.resolveActorRole(userId, task.projectId)
+            : PROJECT_ROLE.TEAM_LEAD;
+
+        // Elevated role so rebug can always move back to development
+        return this.transitionTask(
+            taskId,
+            devStage.id,
+            userId,
+            ELEVATED_PROJECT_ROLES.includes(actorRole) ? actorRole : PROJECT_ROLE.TEAM_LEAD
+        );
     }
 
     /**

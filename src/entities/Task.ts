@@ -35,6 +35,21 @@ export interface TaskMetadata {
     }>;
     estimatedHours?: number;
     actualHours?: number;
+    /** Sprint / release tracking */
+    live?: boolean;
+    liveAt?: string;
+    rebugCount?: number;
+    qaReturnCount?: number;
+    qaReturns?: Array<{
+        fromStageId?: string;
+        fromStageName?: string;
+        toStageId?: string;
+        toStageName?: string;
+        reason?: string;
+        at: string;
+        by?: string;
+        returnedTo: "developer" | string;
+    }>;
 }
 
 @Entity("tasks")

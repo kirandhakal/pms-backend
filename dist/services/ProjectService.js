@@ -141,7 +141,16 @@ class ProjectService {
             };
             viewerRole = roleMap[member.role] || viewerRole;
         }
-        const visibleStages = await WorkflowEngine_1.workflowEngine.getVisibleStages(project.workflowId, viewerRole);
+        // Elevated roles (org creator / PM / team lead) see all stages
+        const isElevated = viewerRole === "ORG_CREATOR" ||
+            viewerRole === "PROJECT_MANAGER" ||
+            viewerRole === "TEAM_LEAD";
+        // New per-stage visibility (TEAM_ONLY | PROJECT_WIDE + stage members)
+        let visibleStages = await WorkflowEngine_1.workflowEngine.getVisibleStagesForUser(project.workflowId, userId, isElevated);
+        // Also apply legacy role-category visibility for non-elevated viewers
+        if (!isElevated) {
+            visibleStages = visibleStages.filter((stage) => (0, workflow_stages_1.canViewStage)({ category: stage.settings?.category, settings: stage.settings }, viewerRole));
+        }
         return {
             project,
             viewerRole,

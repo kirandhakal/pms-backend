@@ -31,6 +31,15 @@ const DirectMessage_1 = require("../entities/DirectMessage");
 const ProjectMember_1 = require("../entities/ProjectMember");
 const OrganizationPermission_1 = require("../entities/OrganizationPermission");
 const UserOrganization_1 = require("../entities/UserOrganization");
+// New entities
+const TeamRole_1 = require("../entities/TeamRole");
+const TeamMembership_1 = require("../entities/TeamMembership");
+const WorkflowStageMember_1 = require("../entities/WorkflowStageMember");
+const Meeting_1 = require("../entities/Meeting");
+const MeetingParticipant_1 = require("../entities/MeetingParticipant");
+const MeetingNote_1 = require("../entities/MeetingNote");
+const MinutesOfMeeting_1 = require("../entities/MinutesOfMeeting");
+const MomActionItem_1 = require("../entities/MomActionItem");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const nodeEnv = (process.env.NODE_ENV || "").trim().toLowerCase();
@@ -78,7 +87,16 @@ exports.AppDataSource = new typeorm_1.DataSource({
         DirectMessage_1.DirectMessage,
         ProjectMember_1.ProjectMember,
         OrganizationPermission_1.OrganizationPermission,
-        UserOrganization_1.UserOrganization
+        UserOrganization_1.UserOrganization,
+        // New entities
+        TeamRole_1.TeamRole,
+        TeamMembership_1.TeamMembership,
+        WorkflowStageMember_1.WorkflowStageMember,
+        Meeting_1.Meeting,
+        MeetingParticipant_1.MeetingParticipant,
+        MeetingNote_1.MeetingNote,
+        MinutesOfMeeting_1.MinutesOfMeeting,
+        MomActionItem_1.MomActionItem,
     ],
     migrations: [],
     subscribers: [],

@@ -4,11 +4,13 @@ exports.workflowEngine = exports.WorkflowEngine = exports.DEFAULT_WORKFLOW_STAGE
 const data_source_1 = require("../config/data-source");
 const Workflow_1 = require("../entities/Workflow");
 const WorkflowStage_1 = require("../entities/WorkflowStage");
+const WorkflowStageMember_1 = require("../entities/WorkflowStageMember");
 const Task_1 = require("../entities/Task");
 const TaskActivity_1 = require("../entities/TaskActivity");
 const errorHandler_1 = require("../middlewares/errorHandler");
 const workflow_stages_1 = require("../constants/workflow-stages");
 const WorklogService_1 = require("./WorklogService");
+const ProjectMember_1 = require("../entities/ProjectMember");
 /**
  * Default workflow stages
  */
@@ -32,6 +34,7 @@ class WorkflowEngine {
     constructor() {
         this.workflowRepo = data_source_1.AppDataSource.getRepository(Workflow_1.Workflow);
         this.stageRepo = data_source_1.AppDataSource.getRepository(WorkflowStage_1.WorkflowStage);
+        this.stageMemberRepo = data_source_1.AppDataSource.getRepository(WorkflowStageMember_1.WorkflowStageMember);
         this.taskRepo = data_source_1.AppDataSource.getRepository(Task_1.Task);
         this.activityRepo = data_source_1.AppDataSource.getRepository(TaskActivity_1.TaskActivity);
     }
@@ -120,7 +123,7 @@ class WorkflowEngine {
     async getWorkflowById(workflowId) {
         return this.workflowRepo.findOne({
             where: { id: workflowId },
-            relations: ["stages"],
+            relations: ["stages", "stages.stageMembers"],
             order: { stages: { order: "ASC" } }
         });
     }
@@ -236,7 +239,7 @@ class WorkflowEngine {
     /**
      * Transition task to a new stage
      */
-    async transitionTask(taskId, toStageId, userId) {
+    async transitionTask(taskId, toStageId, userId, actorRole) {
         const task = await this.taskRepo.findOne({
             where: { id: taskId },
             relations: ["stage", "workflow", "workflow.stages"]
@@ -253,6 +256,19 @@ class WorkflowEngine {
         const isValidTransition = await this.validateTransition(task.workflow, fromStage, toStage);
         if (!isValidTransition) {
             throw new errorHandler_1.ApiError(`Cannot transition from "${fromStage.name}" to "${toStage.name}"`, 400);
+        }
+        // Role-based drag: non-elevated actors may only move stages in their team category
+        if (actorRole && !(0, workflow_stages_1.canDragStage)({
+            category: fromStage.settings?.category,
+            settings: fromStage.settings,
+        }, actorRole)) {
+            throw new errorHandler_1.ApiError(`Role ${actorRole} cannot drag tasks from stage "${fromStage.name}"`, 403);
+        }
+        if (actorRole && !(0, workflow_stages_1.canDragStage)({
+            category: toStage.settings?.category,
+            settings: toStage.settings,
+        }, actorRole) && !workflow_stages_1.ELEVATED_PROJECT_ROLES.includes(actorRole)) {
+            throw new errorHandler_1.ApiError(`Role ${actorRole} cannot drop tasks onto stage "${toStage.name}"`, 403);
         }
         // Execute onExit hook for current stage
         await this.executeOnExit(task, fromStage);
@@ -273,6 +289,29 @@ class WorkflowEngine {
         else {
             task.status = Task_1.TaskStatus.IN_PROGRESS;
             task.completedAt = undefined;
+        }
+        // QA / tester send-back → development: persist sprint return ledger
+        const fromCategory = (fromStage.settings?.category || "").toLowerCase();
+        const toCategory = (toStage.settings?.category || "").toLowerCase();
+        const isSendBackToDev = toCategory === "development" &&
+            (fromCategory === "testing" || fromCategory === "qa" || fromCategory === "devops");
+        if (isSendBackToDev) {
+            const meta = { ...(task.metadata || {}) };
+            meta.qaReturnCount = (meta.qaReturnCount || 0) + 1;
+            meta.qaReturns = [
+                ...(meta.qaReturns || []),
+                {
+                    fromStageId: oldStageId,
+                    fromStageName: fromStage.name,
+                    toStageId,
+                    toStageName: toStage.name,
+                    at: new Date().toISOString(),
+                    by: userId,
+                    returnedTo: "developer",
+                },
+            ];
+            meta.live = false;
+            task.metadata = meta;
         }
         const savedTask = await this.taskRepo.save(task);
         // Execute onEnter hook for new stage
@@ -307,6 +346,84 @@ class WorkflowEngine {
             toStage,
             activity: savedActivity
         };
+    }
+    /**
+     * Resolve the caller's project role for drag ACL (falls back to MEMBER).
+     */
+    async resolveActorRole(userId, projectId) {
+        if (!projectId)
+            return workflow_stages_1.PROJECT_ROLE.MEMBER;
+        const memberRepo = data_source_1.AppDataSource.getRepository(ProjectMember_1.ProjectMember);
+        const member = await memberRepo.findOne({ where: { projectId, userId } });
+        if (!member)
+            return workflow_stages_1.PROJECT_ROLE.MEMBER;
+        const map = {
+            [ProjectMember_1.ProjectMemberRole.PROJECT_MANAGER]: workflow_stages_1.PROJECT_ROLE.PROJECT_MANAGER,
+            [ProjectMember_1.ProjectMemberRole.TEAM_LEAD]: workflow_stages_1.PROJECT_ROLE.TEAM_LEAD,
+            [ProjectMember_1.ProjectMemberRole.FRONTEND]: workflow_stages_1.PROJECT_ROLE.FRONTEND,
+            [ProjectMember_1.ProjectMemberRole.BACKEND]: workflow_stages_1.PROJECT_ROLE.BACKEND,
+            [ProjectMember_1.ProjectMemberRole.TESTER]: workflow_stages_1.PROJECT_ROLE.TESTER,
+            [ProjectMember_1.ProjectMemberRole.DEVOPS]: workflow_stages_1.PROJECT_ROLE.DEVOPS,
+            [ProjectMember_1.ProjectMemberRole.MEMBER]: workflow_stages_1.PROJECT_ROLE.MEMBER,
+        };
+        return map[member.role] || workflow_stages_1.PROJECT_ROLE.MEMBER;
+    }
+    /**
+     * Mark a completed task as live (released).
+     */
+    async markLive(taskId, userId) {
+        const task = await this.taskRepo.findOne({ where: { id: taskId } });
+        if (!task)
+            throw new errorHandler_1.ApiError("Task not found", 404);
+        if (task.status !== Task_1.TaskStatus.DONE) {
+            throw new errorHandler_1.ApiError("Only completed tasks can be marked live", 400);
+        }
+        const meta = { ...(task.metadata || {}) };
+        meta.live = true;
+        meta.liveAt = new Date().toISOString();
+        task.metadata = meta;
+        const saved = await this.taskRepo.save(task);
+        await this.activityRepo.save(this.activityRepo.create({
+            taskId,
+            userId,
+            type: TaskActivity_1.TaskActivityType.UPDATED,
+            description: "Marked live",
+            details: { fieldName: "live", newValue: true },
+        }));
+        return saved;
+    }
+    /**
+     * Rebug a live/completed task: send back to first development stage, +1 rebug.
+     */
+    async rebug(taskId, reason, userId) {
+        const task = await this.taskRepo.findOne({
+            where: { id: taskId },
+            relations: ["workflow", "workflow.stages", "stage"],
+        });
+        if (!task)
+            throw new errorHandler_1.ApiError("Task not found", 404);
+        if (!task.metadata?.live && task.status !== Task_1.TaskStatus.DONE) {
+            throw new errorHandler_1.ApiError("Only live or completed tasks can be rebuged", 400);
+        }
+        if (!task.workflowId) {
+            throw new errorHandler_1.ApiError("Task has no workflow", 400);
+        }
+        const stages = (task.workflow?.stages || []).slice().sort((a, b) => a.order - b.order);
+        const devStage = stages.find((s) => (s.settings?.category || "").toLowerCase() === "development") ||
+            stages.find((s) => !s.isDefault && !s.isFinal);
+        if (!devStage) {
+            throw new errorHandler_1.ApiError("No development stage found for rebug", 400);
+        }
+        const meta = { ...(task.metadata || {}) };
+        meta.rebugCount = (meta.rebugCount || 0) + 1;
+        meta.live = false;
+        task.metadata = meta;
+        await this.taskRepo.save(task);
+        const actorRole = userId
+            ? await this.resolveActorRole(userId, task.projectId)
+            : workflow_stages_1.PROJECT_ROLE.TEAM_LEAD;
+        // Elevated role so rebug can always move back to development
+        return this.transitionTask(taskId, devStage.id, userId, workflow_stages_1.ELEVATED_PROJECT_ROLES.includes(actorRole) ? actorRole : workflow_stages_1.PROJECT_ROLE.TEAM_LEAD);
     }
     /**
      * Validate if transition is allowed
@@ -390,6 +507,98 @@ class WorkflowEngine {
             };
         }));
         return stats;
+    }
+    // ─────────────────────────────────────────────────
+    // STAGE VISIBILITY & MEMBER MANAGEMENT
+    // ─────────────────────────────────────────────────
+    /**
+     * Update stage visibility (TEAM_ONLY | PROJECT_WIDE)
+     */
+    async updateStageVisibility(stageId, visibility) {
+        const stage = await this.stageRepo.findOne({ where: { id: stageId } });
+        if (!stage)
+            throw new errorHandler_1.ApiError("Stage not found", 404);
+        stage.visibility = visibility;
+        return this.stageRepo.save(stage);
+    }
+    /**
+     * Add member(s) to a stage (for TEAM_ONLY visibility)
+     */
+    async addStageMembers(stageId, userIds) {
+        const stage = await this.stageRepo.findOne({ where: { id: stageId } });
+        if (!stage)
+            throw new errorHandler_1.ApiError("Stage not found", 404);
+        const existing = await this.stageMemberRepo.find({ where: { stageId } });
+        const existingSet = new Set(existing.map((m) => m.userId));
+        const newMembers = userIds
+            .filter((id) => !existingSet.has(id))
+            .map((userId) => this.stageMemberRepo.create({ stageId, userId }));
+        if (newMembers.length === 0)
+            return existing;
+        const saved = await this.stageMemberRepo.save(newMembers);
+        return [...existing, ...saved];
+    }
+    /**
+     * Remove a member from a stage
+     */
+    async removeStageMember(stageId, userId) {
+        const member = await this.stageMemberRepo.findOne({
+            where: { stageId, userId },
+        });
+        if (!member)
+            throw new errorHandler_1.ApiError("Stage member not found", 404);
+        await this.stageMemberRepo.remove(member);
+    }
+    /**
+     * List members of a stage
+     */
+    async getStageMembers(stageId) {
+        return this.stageMemberRepo.find({
+            where: { stageId },
+            relations: ["user"],
+        });
+    }
+    /**
+     * Check if a user can view a stage based on visibility rules.
+     * canViewStageForUser(userId, stage) =
+     *   user.roleLevel IN (TEAM_LEAD, PROJECT_MANAGER, ORG_CREATOR)
+     *   OR stage.visibility == PROJECT_WIDE
+     *   OR user.id IN stage.members
+     */
+    async canUserViewStage(userId, stageId, isElevatedRole) {
+        if (isElevatedRole)
+            return true;
+        const stage = await this.stageRepo.findOne({ where: { id: stageId } });
+        if (!stage)
+            return false;
+        if (stage.visibility === WorkflowStage_1.StageVisibility.PROJECT_WIDE)
+            return true;
+        // TEAM_ONLY — check membership
+        const member = await this.stageMemberRepo.findOne({
+            where: { stageId, userId },
+        });
+        return !!member;
+    }
+    /**
+     * Filter stages of a workflow based on user visibility.
+     * Returns only visually accessible stages for the user.
+     */
+    async getVisibleStagesForUser(workflowId, userId, isElevatedRole) {
+        const workflow = await this.workflowRepo.findOne({
+            where: { id: workflowId },
+            relations: ["stages", "stages.stageMembers"],
+            order: { stages: { order: "ASC" } },
+        });
+        if (!workflow)
+            throw new errorHandler_1.ApiError("Workflow not found", 404);
+        if (isElevatedRole)
+            return workflow.stages;
+        return workflow.stages.filter((stage) => {
+            if (stage.visibility === WorkflowStage_1.StageVisibility.PROJECT_WIDE)
+                return true;
+            // TEAM_ONLY — check if user is in stage members
+            return stage.stageMembers?.some((m) => m.userId === userId);
+        });
     }
 }
 exports.WorkflowEngine = WorkflowEngine;

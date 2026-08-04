@@ -9,46 +9,44 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Team = void 0;
+exports.TeamRole = void 0;
 const typeorm_1 = require("typeorm");
-const User_1 = require("./User");
-const Project_1 = require("./Project");
+const Organization_1 = require("./Organization");
 const TeamMembership_1 = require("./TeamMembership");
-let Team = class Team {
+let TeamRole = class TeamRole {
 };
-exports.Team = Team;
+exports.TeamRole = TeamRole;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
     __metadata("design:type", String)
-], Team.prototype, "id", void 0);
+], TeamRole.prototype, "id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => Organization_1.Organization, { onDelete: "CASCADE" }),
+    (0, typeorm_1.JoinColumn)({ name: "organizationId" }),
+    __metadata("design:type", Organization_1.Organization)
+], TeamRole.prototype, "organization", void 0);
 __decorate([
     (0, typeorm_1.Column)(),
+    (0, typeorm_1.Index)(),
     __metadata("design:type", String)
-], Team.prototype, "name", void 0);
+], TeamRole.prototype, "organizationId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true }),
+    (0, typeorm_1.Column)({ length: 100 }),
     __metadata("design:type", String)
-], Team.prototype, "createdById", void 0);
+], TeamRole.prototype, "name", void 0);
 __decorate([
-    (0, typeorm_1.OneToMany)(() => User_1.User, (user) => user.team),
-    __metadata("design:type", Array)
-], Team.prototype, "members", void 0);
+    (0, typeorm_1.Column)({ default: false }),
+    __metadata("design:type", Boolean)
+], TeamRole.prototype, "isSystem", void 0);
 __decorate([
-    (0, typeorm_1.OneToMany)(() => Project_1.Project, (project) => project.team),
+    (0, typeorm_1.OneToMany)(() => TeamMembership_1.TeamMembership, (m) => m.teamRole),
     __metadata("design:type", Array)
-], Team.prototype, "projects", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => TeamMembership_1.TeamMembership, (m) => m.team),
-    __metadata("design:type", Array)
-], Team.prototype, "memberships", void 0);
+], TeamRole.prototype, "memberships", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
-], Team.prototype, "createdAt", void 0);
-__decorate([
-    (0, typeorm_1.UpdateDateColumn)(),
-    __metadata("design:type", Date)
-], Team.prototype, "updatedAt", void 0);
-exports.Team = Team = __decorate([
-    (0, typeorm_1.Entity)("teams")
-], Team);
+], TeamRole.prototype, "createdAt", void 0);
+exports.TeamRole = TeamRole = __decorate([
+    (0, typeorm_1.Entity)("team_roles"),
+    (0, typeorm_1.Unique)(["organizationId", "name"])
+], TeamRole);

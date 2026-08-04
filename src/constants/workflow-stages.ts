@@ -126,3 +126,32 @@ export function canViewStage(
 
     return false;
 }
+
+/** Dev/Frontend/Backend can only drag development stages; Tester → testing; etc. */
+export function canDragStage(
+    stage: { category?: string; settings?: StageSettings; assignedRole?: ProjectRole },
+    actorRole: ProjectRole
+): boolean {
+    if (ELEVATED_PROJECT_ROLES.includes(actorRole)) {
+        return true;
+    }
+
+    const category = stage.settings?.category || stage.category;
+    const assignedRole =
+        (stage.settings?.assignedRole as ProjectRole | undefined) || stage.assignedRole;
+
+    const roleCategory: Partial<Record<ProjectRole, string>> = {
+        [PROJECT_ROLE.FRONTEND]: "development",
+        [PROJECT_ROLE.BACKEND]: "development",
+        [PROJECT_ROLE.MEMBER]: "development",
+        [PROJECT_ROLE.TESTER]: "testing",
+        [PROJECT_ROLE.DEVOPS]: "devops",
+        [PROJECT_ROLE.PM]: "backlog",
+    };
+
+    if (assignedRole && assignedRole === actorRole) {
+        return true;
+    }
+
+    return roleCategory[actorRole] !== undefined && roleCategory[actorRole] === category;
+}
