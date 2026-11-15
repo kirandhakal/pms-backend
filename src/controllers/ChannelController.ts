@@ -58,7 +58,8 @@ export class ChannelController {
             const message = await channelService.sendMessage(
                 req.user!.id,
                 String(req.params.id),
-                req.body.body
+                req.body.body,
+                req.body.clientMessageId
             );
             res.status(201).json({ data: message });
         } catch (err: any) {

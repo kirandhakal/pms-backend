@@ -26,3 +26,4 @@ yarn-error.log*
 COMPLETION_FEATURES.md
 FEATURES.md
 *.md
+!docs/CHAT.md

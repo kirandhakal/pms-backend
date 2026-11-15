@@ -14,7 +14,10 @@ import meetingRoutes from "./meeting.routes";
 import momRoutes from "./mom.routes";
 import publicMeetingRoutes from "./public-meeting.routes";
 
+import { chatRouter } from "../realtime/chat";
+
 const router = Router();
+router.use("/chat", chatRouter);
 
 router.use("/auth", authRoutes);
 router.use("/projects", projectRoutes);

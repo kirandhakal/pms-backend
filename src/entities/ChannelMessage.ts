@@ -12,7 +12,14 @@ import { Channel } from "./Channel";
 import { User } from "./User";
 
 @Entity("channel_messages")
+@Index(["channelId", "userId", "clientMessageId"], { unique: true })
 export class ChannelMessage {
+    @Column({ type: "uuid", nullable: true })
+    clientMessageId?: string;
+
+    @Column({ type: "bigint", generated: "increment" })
+    chatSequence!: string;
+
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 

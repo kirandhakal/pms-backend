@@ -1,3 +1,5 @@
+import { send as sendChat } from "../realtime/chat";
+import { randomUUID } from "crypto";
 import { AppDataSource } from "../config/data-source";
 import { Channel, ChannelType } from "../entities/Channel";
 import { ChannelMember } from "../entities/ChannelMember";
@@ -20,6 +22,7 @@ export class ChannelService {
     }
 
     private async canAccessChannel(userId: string, channel: Channel): Promise<boolean> {
+        await this.ensureTeamMember(userId, channel.teamId);
         if (channel.type === ChannelType.PUBLIC) {
             return true;
         }
@@ -121,22 +124,8 @@ export class ChannelService {
         });
     }
 
-    async sendMessage(userId: string, channelId: string, body: string): Promise<ChannelMessage> {
-        const channel = await this.channelRepo.findOne({ where: { id: channelId } });
-        if (!channel || !channel.isActive) {
-            throw new ApiError("Channel not found", 404);
-        }
-        if (!(await this.canAccessChannel(userId, channel))) {
-            throw new ApiError("You do not have access to this channel", 403);
-        }
-
-        const membership = await this.memberRepo.findOne({ where: { channelId, userId } });
-        if (membership?.isMuted) {
-            throw new ApiError("Channel is muted", 400);
-        }
-
-        const message = this.messageRepo.create({ channelId, userId, body: body.trim() });
-        return this.messageRepo.save(message);
+    async sendMessage(userId: string, channelId: string, body: string, clientMessageId = randomUUID()): Promise<any> {
+        return sendChat(userId, { kind: "channel", id: channelId, body, clientMessageId });
     }
 
     async deleteMessage(userId: string, messageId: string): Promise<void> {

@@ -34,6 +34,8 @@ import { MeetingParticipant } from "../entities/MeetingParticipant";
 import { MeetingNote } from "../entities/MeetingNote";
 import { MinutesOfMeeting } from "../entities/MinutesOfMeeting";
 import { MomActionItem } from "../entities/MomActionItem";
+import { ProjectMessage } from "../entities/ProjectMessage";
+import { ReliableChat1794700000000 } from "../migrations/1794700000000-ReliableChat";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -60,7 +62,7 @@ export const AppDataSource = new DataSource({
             database: databaseName
         }),
     synchronize: nodeEnv === "development",
-    logging: nodeEnv === "development",
+    logging: false,
     entities: [
         User,
         Team,
@@ -84,6 +86,7 @@ export const AppDataSource = new DataSource({
         ChannelMessage,
         Friendship,
         DirectMessage,
+        ProjectMessage,
         ProjectMember,
         OrganizationPermission,
         UserOrganization,
@@ -97,6 +100,6 @@ export const AppDataSource = new DataSource({
         MinutesOfMeeting,
         MomActionItem,
     ],
-    migrations: [],
+    migrations: [ReliableChat1794700000000],
     subscribers: [],
 });

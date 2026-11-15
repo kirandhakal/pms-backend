@@ -1,3 +1,4 @@
+import { ApiError } from "./errorHandler";
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../utils/auth";
 import { AppDataSource } from "../config/data-source";
@@ -31,28 +32,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         }
 
         const token = authHeader.split(" ")[1];
-        const decoded = verifyToken(token);
-
-        if (!decoded) {
-            res.status(401).json({ message: "Invalid or expired token" });
-            return;
-        }
-
-        const sessionRepo = AppDataSource.getRepository(Session);
-        const session = await sessionRepo.findOne({
-            where: { token, isActive: true },
-            relations: ["user", "user.role", "user.team"]
-        });
-
-        if (!session) {
-            res.status(401).json({ message: "Session inactive or logged out" });
-            return;
-        }
-
-        if (!session.user || !session.user.isActive || session.expiresAt <= new Date()) {
-            res.status(401).json({ message: "Session expired or user inactive" });
-            return;
-        }
+        const session = await authenticateToken(token);
 
         req.user = {
             id: session.user.id,
@@ -82,3 +62,17 @@ export const authorizeRoles = (...roles: UserRole[]) => {
 };
 
 export const authorize = (roles: UserRole[]) => authorizeRoles(...roles);
+export async function authenticateToken(token: string) {
+    if (!verifyToken(token)) {
+        throw new ApiError("Invalid or expired token", 401);
+    }
+    const session = await AppDataSource.getRepository(Session).findOne({
+        where: { token, isActive: true },
+        relations: ["user", "user.role", "user.team"],
+    });
+    if (!session) throw new ApiError("Session inactive or logged out", 401);
+    if (!session.user || !session.user.isActive || session.expiresAt <= new Date()) {
+        throw new ApiError("Session expired or user inactive", 401);
+    }
+    return session;
+}

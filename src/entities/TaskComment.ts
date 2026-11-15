@@ -13,7 +13,14 @@ import { User } from "./User";
 
 @Entity("task_comments")
 @Index(["taskId", "createdAt"])
+@Index(["taskId", "userId", "clientMessageId"], { unique: true })
 export class TaskComment {
+    @Column({ type: "uuid", nullable: true })
+    clientMessageId?: string;
+
+    @Column({ type: "bigint", generated: "increment" })
+    chatSequence!: string;
+
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 

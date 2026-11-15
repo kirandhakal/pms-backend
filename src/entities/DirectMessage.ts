@@ -11,7 +11,14 @@ import {
 import { User } from "./User";
 
 @Entity("direct_messages")
+@Index(["senderId", "recipientId", "clientMessageId"], { unique: true })
 export class DirectMessage {
+    @Column({ type: "uuid", nullable: true })
+    clientMessageId?: string;
+
+    @Column({ type: "bigint", generated: "increment" })
+    chatSequence!: string;
+
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 

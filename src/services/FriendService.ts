@@ -1,3 +1,5 @@
+import { send as sendChat } from "../realtime/chat";
+import { randomUUID } from "crypto";
 import { ILike, Not } from "typeorm";
 import { AppDataSource } from "../config/data-source";
 import { Friendship, FriendshipStatus } from "../entities/Friendship";
@@ -118,19 +120,8 @@ export class FriendService {
         });
     }
 
-    async sendDirectMessage(
-        senderId: string,
-        recipientId: string,
-        body: string
-    ): Promise<DirectMessage> {
-        await this.ensureFriendship(senderId, recipientId);
-
-        const message = this.messageRepo.create({
-            senderId,
-            recipientId,
-            body: body.trim(),
-        });
-        return this.messageRepo.save(message);
+    async sendDirectMessage(senderId: string, recipientId: string, body: string, clientMessageId = randomUUID()): Promise<any> {
+        return sendChat(senderId, { kind: "friend", id: recipientId, body, clientMessageId });
     }
 
     async setDmMute(userId: string, otherUserId: string, isMuted: boolean): Promise<void> {

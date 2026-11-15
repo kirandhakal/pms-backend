@@ -11,7 +11,9 @@
     "seed:roles": "ts-node src/seeds/seedDefaultRoles.ts",
     "seed:admin": "ts-node src/seeds/seedSuperAdmin.ts",
     "seed:all": "npm run seed:permissions && npm run seed:roles && npm run seed:admin",
-    "typeorm": "typeorm"
+    "typeorm": "typeorm",
+    "test:chat": "npm run build && node tests/chat.test.cjs",
+    "migration:run": "npm run build && typeorm migration:run -d dist/config/data-source.js"
   },
   "keywords": [],
   "author": "",
@@ -33,7 +35,8 @@
     "pg": "^8.18.0",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.28",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
