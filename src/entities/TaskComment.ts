@@ -15,6 +15,21 @@ import { User } from "./User";
 @Index(["taskId", "createdAt"])
 @Index(["taskId", "userId", "clientMessageId"], { unique: true })
 export class TaskComment {
+    @Column({ type: "bigint", default: "0" })
+    chatVersion!: string;
+
+    @Column({ type: "uuid", nullable: true })
+    replyToMessageId?: string | null;
+
+    @Column({ type: "timestamptz", nullable: true })
+    pinnedAt?: Date | null;
+
+    @Column({ type: "uuid", nullable: true })
+    pinnedById?: string | null;
+
+    @Column({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" })
+    chatUpdatedAt!: Date;
+
     @Column({ type: "uuid", nullable: true })
     clientMessageId?: string;
 

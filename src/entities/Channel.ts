@@ -21,6 +21,9 @@ export enum ChannelType {
 
 @Entity("channels")
 export class Channel {
+    @Column({ type: "jsonb", nullable: true })
+    allowedFileTypes?: string[] | null;
+
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 

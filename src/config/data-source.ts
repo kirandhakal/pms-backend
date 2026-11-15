@@ -36,6 +36,9 @@ import { MinutesOfMeeting } from "../entities/MinutesOfMeeting";
 import { MomActionItem } from "../entities/MomActionItem";
 import { ProjectMessage } from "../entities/ProjectMessage";
 import { ReliableChat1794700000000 } from "../migrations/1794700000000-ReliableChat";
+import { ChatAttachment } from "../entities/ChatAttachment";
+import { ChatMedia1794700001000 } from "../migrations/1794700001000-ChatMedia";
+import { ChatEvent } from "../entities/ChatEvent";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -87,6 +90,8 @@ export const AppDataSource = new DataSource({
         Friendship,
         DirectMessage,
         ProjectMessage,
+        ChatAttachment,
+        ChatEvent,
         ProjectMember,
         OrganizationPermission,
         UserOrganization,
@@ -100,6 +105,6 @@ export const AppDataSource = new DataSource({
         MinutesOfMeeting,
         MomActionItem,
     ],
-    migrations: [ReliableChat1794700000000],
+    migrations: [ReliableChat1794700000000, ChatMedia1794700001000],
     subscribers: [],
 });

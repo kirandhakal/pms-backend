@@ -4,6 +4,21 @@ import { User } from "./User";
 @Entity("project_messages")
 @Index(["projectId", "userId", "clientMessageId"], { unique: true })
 export class ProjectMessage {
+    @Column({ type: "bigint", default: "0" })
+    chatVersion!: string;
+
+    @Column({ type: "uuid", nullable: true })
+    replyToMessageId?: string | null;
+
+    @Column({ type: "timestamptz", nullable: true })
+    pinnedAt?: Date | null;
+
+    @Column({ type: "uuid", nullable: true })
+    pinnedById?: string | null;
+
+    @Column({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" })
+    chatUpdatedAt!: Date;
+
  @PrimaryGeneratedColumn("uuid") id!: string;
  @Column() projectId!: string;
  @ManyToOne(() => Project, { onDelete: "CASCADE" }) @JoinColumn({name:"projectId"}) project!: Project;
