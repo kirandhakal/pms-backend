@@ -4,6 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 require("reflect-metadata");
+const http_1 = require("http");
+const chat_1 = require("./realtime/chat");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
@@ -25,7 +27,9 @@ app.use(errorHandler_1.errorHandler);
 data_source_1.AppDataSource.initialize()
     .then(() => {
     console.log("Data Source has been initialized!");
-    app.listen(PORT, () => {
+    const server = (0, http_1.createServer)(app);
+    (0, chat_1.attachChat)(server);
+    server.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
     });
 })

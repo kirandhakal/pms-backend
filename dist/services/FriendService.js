@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.friendService = exports.FriendService = void 0;
+const chat_1 = require("../realtime/chat");
+const crypto_1 = require("crypto");
 const typeorm_1 = require("typeorm");
 const data_source_1 = require("../config/data-source");
 const Friendship_1 = require("../entities/Friendship");
@@ -101,14 +103,8 @@ class FriendService {
             order: { createdAt: "ASC" },
         });
     }
-    async sendDirectMessage(senderId, recipientId, body) {
-        await this.ensureFriendship(senderId, recipientId);
-        const message = this.messageRepo.create({
-            senderId,
-            recipientId,
-            body: body.trim(),
-        });
-        return this.messageRepo.save(message);
+    async sendDirectMessage(senderId, recipientId, body, clientMessageId = (0, crypto_1.randomUUID)()) {
+        return (0, chat_1.send)(senderId, { kind: "friend", id: recipientId, body, clientMessageId });
     }
     async setDmMute(userId, otherUserId, isMuted) {
         const messages = await this.messageRepo.find({

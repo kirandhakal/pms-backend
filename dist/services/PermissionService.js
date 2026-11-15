@@ -7,13 +7,21 @@ const OrganizationPermission_1 = require("../entities/OrganizationPermission");
 const User_1 = require("../entities/User");
 const FRONTEND_PERMISSION_MAP = {
     [access_1.PermissionKey.PROJECT_CREATE]: [{ resource: "workflows", action: "create", scope: "organization" }],
+    [access_1.PermissionKey.TASK_CREATE]: [{ resource: "tasks", action: "create", scope: "organization" }],
+    [access_1.PermissionKey.MEETING_SCHEDULE]: [{ resource: "meetings", action: "create", scope: "organization" }],
+    [access_1.PermissionKey.WORKFLOW_TASK_CREATE]: [{ resource: "workflows", action: "update", scope: "organization" }],
+    [access_1.PermissionKey.WORKFLOW_BOARD_EDIT]: [{ resource: "workflows", action: "manage", scope: "organization" }],
+    [access_1.PermissionKey.WORKFLOW_BOARD_ACCESS]: [{ resource: "workflows", action: "read", scope: "organization" }],
+    [access_1.PermissionKey.CHANNEL_CREATE]: [{ resource: "organizations", action: "create", scope: "organization" }],
+    [access_1.PermissionKey.CHANNEL_INVITE]: [{ resource: "organizations", action: "invite", scope: "organization" }],
+    [access_1.PermissionKey.DASHBOARD_ANALYTICS]: [{ resource: "dashboard", action: "read", scope: "organization" }],
     [access_1.PermissionKey.VIEW_TEAM_ACTIVITY]: [{ resource: "audit_logs", action: "read", scope: "organization" }],
     [access_1.PermissionKey.VIEW_TEAM_ANALYTICS]: [{ resource: "reports", action: "read", scope: "organization" }],
     [access_1.PermissionKey.VIEW_TEAM_PROGRESS]: [{ resource: "dashboard", action: "read", scope: "organization" }],
     [access_1.PermissionKey.BROADCAST_SEND]: [{ resource: "organizations", action: "update", scope: "organization" }],
     [access_1.PermissionKey.BROADCAST_VIEW]: [{ resource: "organizations", action: "read", scope: "organization" }],
     [access_1.PermissionKey.MEMBER_MANAGE]: [{ resource: "users", action: "manage", scope: "organization" }],
-    [access_1.PermissionKey.ROLE_ASSIGN]: [{ resource: "roles", action: "assign", scope: "organization" }]
+    [access_1.PermissionKey.ROLE_ASSIGN]: [{ resource: "roles", action: "assign", scope: "organization" }],
 };
 class PermissionService {
     constructor() {

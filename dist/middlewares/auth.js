@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authorize = exports.authorizeRoles = exports.authenticate = void 0;
+exports.authenticateToken = authenticateToken;
+const errorHandler_1 = require("./errorHandler");
 const auth_1 = require("../utils/auth");
 const data_source_1 = require("../config/data-source");
 const Session_1 = require("../entities/Session");
@@ -12,24 +14,7 @@ const authenticate = async (req, res, next) => {
             return;
         }
         const token = authHeader.split(" ")[1];
-        const decoded = (0, auth_1.verifyToken)(token);
-        if (!decoded) {
-            res.status(401).json({ message: "Invalid or expired token" });
-            return;
-        }
-        const sessionRepo = data_source_1.AppDataSource.getRepository(Session_1.Session);
-        const session = await sessionRepo.findOne({
-            where: { token, isActive: true },
-            relations: ["user", "user.role", "user.team"]
-        });
-        if (!session) {
-            res.status(401).json({ message: "Session inactive or logged out" });
-            return;
-        }
-        if (!session.user || !session.user.isActive || session.expiresAt <= new Date()) {
-            res.status(401).json({ message: "Session expired or user inactive" });
-            return;
-        }
+        const session = await authenticateToken(token);
         req.user = {
             id: session.user.id,
             role: session.user.role,
@@ -58,3 +43,18 @@ const authorizeRoles = (...roles) => {
 exports.authorizeRoles = authorizeRoles;
 const authorize = (roles) => (0, exports.authorizeRoles)(...roles);
 exports.authorize = authorize;
+async function authenticateToken(token) {
+    if (!(0, auth_1.verifyToken)(token)) {
+        throw new errorHandler_1.ApiError("Invalid or expired token", 401);
+    }
+    const session = await data_source_1.AppDataSource.getRepository(Session_1.Session).findOne({
+        where: { token, isActive: true },
+        relations: ["user", "user.role", "user.team"],
+    });
+    if (!session)
+        throw new errorHandler_1.ApiError("Session inactive or logged out", 401);
+    if (!session.user || !session.user.isActive || session.expiresAt <= new Date()) {
+        throw new errorHandler_1.ApiError("Session expired or user inactive", 401);
+    }
+    return session;
+}

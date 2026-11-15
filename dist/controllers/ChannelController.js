@@ -48,7 +48,7 @@ class ChannelController {
     }
     async sendMessage(req, res) {
         try {
-            const message = await ChannelService_1.channelService.sendMessage(req.user.id, String(req.params.id), req.body.body);
+            const message = await ChannelService_1.channelService.sendMessage(req.user.id, String(req.params.id), req.body.body, req.body.clientMessageId);
             res.status(201).json({ data: message });
         }
         catch (err) {

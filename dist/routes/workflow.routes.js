@@ -214,4 +214,90 @@ router.put("/:id/stages/reorder", auth_1.authenticate, permission_1.loadPermissi
         next(error);
     }
 });
+// ──────────────────────────────────────────────
+// STAGE VISIBILITY
+// ──────────────────────────────────────────────
+const updateVisibilitySchema = zod_1.z.object({
+    visibility: zod_1.z.enum(["TEAM_ONLY", "PROJECT_WIDE"]),
+});
+const addStageMembersSchema = zod_1.z.object({
+    userIds: zod_1.z.array(zod_1.z.string().uuid()).min(1),
+});
+/**
+ * @route   PATCH /api/workflows/:workflowId/stages/:stageId/visibility
+ * @desc    Set stage visibility (TEAM_ONLY | PROJECT_WIDE)
+ * @access  Admin+
+ */
+router.patch("/:workflowId/stages/:stageId/visibility", auth_1.authenticate, permission_1.loadPermissions, tenantResolver_1.resolveTenant, (0, permission_1.authorize)(permissions_1.PermissionResource.WORKFLOWS, permissions_1.PermissionAction.UPDATE), (0, validate_1.validateBody)(updateVisibilitySchema), (0, auditLogger_1.auditLog)({
+    action: AuditLog_1.AuditAction.UPDATE,
+    resource: "workflow_stages",
+    getResourceId: (req) => String(req.params.stageId),
+    getDescription: (req) => `Stage visibility set to ${req.body.visibility}`,
+}), async (req, res, next) => {
+    try {
+        const stage = await WorkflowEngine_1.workflowEngine.updateStageVisibility(String(req.params.stageId), req.body.visibility);
+        res.json({ message: "Stage visibility updated", data: stage });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * @route   POST /api/workflows/:workflowId/stages/:stageId/members
+ * @desc    Add members to a stage (for TEAM_ONLY visibility)
+ * @access  Admin+
+ */
+router.post("/:workflowId/stages/:stageId/members", auth_1.authenticate, permission_1.loadPermissions, tenantResolver_1.resolveTenant, (0, permission_1.authorize)(permissions_1.PermissionResource.WORKFLOWS, permissions_1.PermissionAction.UPDATE), (0, validate_1.validateBody)(addStageMembersSchema), async (req, res, next) => {
+    try {
+        const members = await WorkflowEngine_1.workflowEngine.addStageMembers(String(req.params.stageId), req.body.userIds);
+        res.status(201).json({ message: "Stage members added", data: members });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * @route   DELETE /api/workflows/:workflowId/stages/:stageId/members/:userId
+ * @desc    Remove a member from a stage
+ * @access  Admin+
+ */
+router.delete("/:workflowId/stages/:stageId/members/:userId", auth_1.authenticate, permission_1.loadPermissions, tenantResolver_1.resolveTenant, (0, permission_1.authorize)(permissions_1.PermissionResource.WORKFLOWS, permissions_1.PermissionAction.UPDATE), async (req, res, next) => {
+    try {
+        await WorkflowEngine_1.workflowEngine.removeStageMember(String(req.params.stageId), String(req.params.userId));
+        res.json({ message: "Stage member removed" });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * @route   GET /api/workflows/:workflowId/stages/:stageId/members
+ * @desc    List members of a stage
+ * @access  Member+
+ */
+router.get("/:workflowId/stages/:stageId/members", auth_1.authenticate, permission_1.loadPermissions, tenantResolver_1.resolveTenant, (0, permission_1.authorize)(permissions_1.PermissionResource.WORKFLOWS, permissions_1.PermissionAction.READ), async (req, res, next) => {
+    try {
+        const members = await WorkflowEngine_1.workflowEngine.getStageMembers(String(req.params.stageId));
+        res.json({ data: members });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * @route   GET /api/workflows/:id/visible-stages
+ * @desc    Get stages visible to the current user (respects TEAM_ONLY visibility)
+ * @access  Member+
+ */
+router.get("/:id/visible-stages", auth_1.authenticate, permission_1.loadPermissions, tenantResolver_1.resolveTenant, (0, permission_1.authorize)(permissions_1.PermissionResource.WORKFLOWS, permissions_1.PermissionAction.READ), async (req, res, next) => {
+    try {
+        // Elevated roles can see all stages
+        const isElevated = (req.userContext?.roleLevel ?? 99) <= 3; // DEPARTMENT_HEAD and above
+        const stages = await WorkflowEngine_1.workflowEngine.getVisibleStagesForUser(String(req.params.id), req.user.id, isElevated);
+        res.json({ data: stages });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 exports.default = router;

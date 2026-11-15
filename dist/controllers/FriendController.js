@@ -60,7 +60,7 @@ class FriendController {
     }
     async sendMessage(req, res) {
         try {
-            const message = await FriendService_1.friendService.sendDirectMessage(req.user.id, req.body.recipientId, req.body.body);
+            const message = await FriendService_1.friendService.sendDirectMessage(req.user.id, req.body.recipientId, req.body.body, req.body.clientMessageId);
             res.status(201).json({ data: message });
         }
         catch (err) {

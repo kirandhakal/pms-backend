@@ -1,4 +1,4 @@
-import { send as sendChat } from "../realtime/chat";
+import { send as sendChat, changeMessage } from "../realtime/chat";
 import { randomUUID } from "crypto";
 import { AppDataSource } from "../config/data-source";
 import { Channel, ChannelType } from "../entities/Channel";
@@ -133,11 +133,7 @@ export class ChannelService {
         if (!message) {
             throw new ApiError("Message not found", 404);
         }
-        if (message.userId !== userId) {
-            throw new ApiError("You can only delete your own messages", 403);
-        }
-        message.isDeleted = true;
-        await this.messageRepo.save(message);
+        await changeMessage(userId, { kind: "channel", id: message.channelId, messageId, action: "remove" });
     }
 
     async setMute(userId: string, channelId: string, isMuted: boolean): Promise<ChannelMember> {

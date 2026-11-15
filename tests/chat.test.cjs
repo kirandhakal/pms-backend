@@ -39,14 +39,33 @@ test('history rejects ambiguous and unbounded cursors',async()=>{
  await assert.rejects(history(a,{kind:'friend',id:b},{limit:1000}));
  await assert.rejects(history(a,{kind:'friend',id:b},{after:'1 OR true'}));
 });
-test('lost ACK retry returns the original committed message without saving twice',async()=>{
- const original=db.transaction;let saved;let writes=0;
+test('lost ACK retry returns the original committed message without saving or recording another event',async()=>{
+ const {ChatEvent}=require('../dist/entities/ChatEvent');
+ const original=db.transaction;const originalFind=db.manager.find;
+ let saved;let writes=0;let events=0;
  const q={where(){return this},andWhere(){return this},async getOne(){return saved}};
- const manager={query:async()=>{},findOneBy:async()=>({}),getRepository:()=>({createQueryBuilder:()=>q}),create:(_entity,value)=>value,save:async(_entity,value)=>{writes++;saved={...value,id:b,chatSequence:'1',createdAt:new Date()};return saved}};
- db.transaction=async fn=>fn(manager);
+ const manager={
+  query:async()=>{},findOneBy:async()=>({}),
+  getRepository:()=>({createQueryBuilder:()=>q,update:async(_id,values)=>{Object.assign(saved,values);}}),
+  create:(_entity,value)=>value,
+  save:async(entity,value)=>{
+   if(entity===ChatEvent){events++;return {...value,sequence:String(events)};}
+   writes++;saved={...value,id:b,chatSequence:'1',createdAt:new Date()};return saved;
+  }
+ };
+ db.transaction=async fn=>fn(manager);db.manager.find=async()=>[];
  try {
   const request={kind:'friend',id:b,body:'hello',clientMessageId:a};
   const first=await send(a,request);const retry=await send(a,{...request,body:'changed retry'});
-  assert.deepEqual(first,retry);assert.equal(writes,1);assert.equal(retry.body,'hello');
+  assert.deepEqual(first,retry);assert.equal(writes,1);assert.equal(events,1);assert.equal(retry.body,'hello');
+ } finally {db.transaction=original;db.manager.find=originalFind;}
+});
+test('a reply cannot reference a message outside the conversation',async()=>{
+ const original=db.transaction;let saved=false;
+ const q={where(){return this},andWhere(){return this},getOne:async()=>null};
+ db.transaction=async fn=>fn({query:async()=>{},findOneBy:async()=>({}),getRepository:()=>({createQueryBuilder:()=>q}),save:async()=>{saved=true;}});
+ try {
+  await assert.rejects(send(a,{kind:'friend',id:b,body:'reply',clientMessageId:a,replyToMessageId:b}),e=>e.statusCode===400);
+  assert.equal(saved,false);
  } finally {db.transaction=original;}
 });

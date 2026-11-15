@@ -7,7 +7,7 @@ import { AuthRequest } from "../middlewares/auth";
 import { ApiError } from "../middlewares/errorHandler";
 import { ChatAttachment } from "../entities/ChatAttachment";
 import { access, messageQuery, room, targetSchema } from "../realtime/chat";
-import { beginAttachment, cancelAttachment, mediaLimits, mediaPolicy, updateMediaPolicy, uploadAttachment } from "../services/ChatAttachmentService";
+import { beginAttachment, cancelAttachment, mediaLimits, mediaPolicy, pendingAttachment, updateMediaPolicy, uploadAttachment } from "../services/ChatAttachmentService";
 import { chatStorageService } from "../services/ChatStorageService";
 
 // Mounted inside the existing authenticated chat router.
@@ -30,7 +30,9 @@ chatMediaRouter.put("/:kind/:id/attachments/:attachmentId", async (req: AuthRequ
     try {
         const target = targetSchema.parse(req.params);
         z.uuid().parse(req.params.attachmentId);
-        await access(req.user!.id, target);
+        const pending = await pendingAttachment(req.user!.id, target, String(req.params.attachmentId));
+        const length = req.get("content-length");
+        if (length && Number(length) !== pending.size) throw new ApiError("Uploaded size does not match the selected file", 400);
         if (inFlight.size >= 4 || inFlight.has(req.user!.id)) throw new ApiError("Another upload is in progress; try again shortly", 429);
         if (!req.is("application/octet-stream")) throw new ApiError("Use application/octet-stream for file uploads", 415);
         inFlight.add(req.user!.id);

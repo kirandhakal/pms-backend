@@ -148,12 +148,12 @@ async function broadcast(userId: string, t: ChatTarget, event: string, message: 
 export async function send(userId: string, input: unknown) {
     let p: z.infer<typeof sendSchema>;
     try { p = sendSchema.parse(input); } catch { throw new ApiError("Invalid chat request", 400); }
-    if (p.attachmentIds.length > mediaLimits().maxAttachments) throw new ApiError("Too many attachments", 400);
     rate(userId);
     const result = await db.transaction(async m => {
         await lockConversation(m, userId, p);
         const old = await messageQuery(m, userId, p).andWhere('msg."clientMessageId" = :client AND msg."' + (p.kind === "friend" ? "senderId" : "userId") + '" = :sender', { client: p.clientMessageId, sender: userId }).getOne();
         if (old) return { raw: old, created: false };
+        if (p.attachmentIds.length > mediaLimits().maxAttachments) throw new ApiError("Too many attachments", 400);
         if (p.kind === "channel" && (await m.findOneBy(ChannelMember, { channelId: p.id, userId }))?.isMuted) throw new ApiError("Channel is muted", 400);
         if (p.replyToMessageId && !await messageQuery(m, userId, p).andWhere('msg.id = :replyId AND msg."isDeleted" = false', { replyId: p.replyToMessageId }).getOne()) throw new ApiError("Reply target is unavailable in this conversation", 400);
         const shared = { clientMessageId: p.clientMessageId, replyToMessageId: p.replyToMessageId };
@@ -185,7 +185,7 @@ export async function changeMessage(userId: string, input: unknown) {
             if (message.isDeleted) return message;
             message.isDeleted = true; message.pinnedAt = null; message.pinnedById = null;
             if (p.kind === "task") { message.content = ""; message.attachments = null; } else message.body = "";
-            await m.update(ChatAttachment, { conversationKey: room(userId, p), messageId: message.id }, { status: "deleted" });
+            await m.update(ChatAttachment, { conversationKey: room(userId, p), messageId: message.id }, { status: "deleted", expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
         } else {
             if (channel && !owner) throw new ApiError("Only the channel owner can pin messages", 403);
             if (message.isDeleted) throw new ApiError("Message has been removed", 400);
@@ -216,6 +216,7 @@ chatRouter.get("/:kind/:id/messages", route(req => history(req.user!.id, targetS
 chatRouter.get("/:kind/:id/changes", route(req => changes(req.user!.id, targetSchema.parse(req.params), req.query)));
 chatRouter.post("/:kind/:id/messages/:messageId/action", route(req => changeMessage(req.user!.id, { ...req.body, ...req.params })));
 export function attachChat(server: HttpServer) {
+    mediaLimits();
     io = new Server(server, { cors: { origin: origins }, maxHttpBufferSize: 20000, allowRequest: (req, done) => done(null, !req.headers.origin || origins.includes(req.headers.origin)) });
     io.use(async (socket, next) => {
         try {

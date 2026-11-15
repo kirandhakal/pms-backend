@@ -40,8 +40,13 @@ export async function updateMediaPolicy(userId: string, t: Target, input: unknow
     const policy = await mediaPolicy(userId, t);
     if (!policy.canManage) throw new ApiError("Only the channel owner can change file types", 403);
     const { allowedTypes } = z.object({ allowedTypes: z.array(z.string().refine(mime => FILE_TYPES.some(f => f.mime === mime))).max(FILE_TYPES.length) }).parse(input);
-    await db.getRepository(Channel).update({ id: t.id, createdById: userId }, { allowedFileTypes: [...new Set(allowedTypes)] });
-    return mediaPolicy(userId, t);
+    return db.transaction(async m => {
+        await m.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [room(userId, t)]);
+        const current = await mediaPolicy(userId, t, m);
+        if (!current.canManage) throw new ApiError("Only the channel owner can change file types", 403);
+        await m.update(Channel, { id: t.id, createdById: userId }, { allowedFileTypes: [...new Set(allowedTypes)] });
+        return mediaPolicy(userId, t, m);
+    });
 }
 export function validateFileMetadata(name: string, mimeType: string, size: number, allowedTypes: string[]) {
     const type = FILE_TYPES.find(type => type.mime === mimeType);
@@ -84,15 +89,16 @@ export async function beginAttachment(userId: string, t: Target, input: unknown)
         })));
     });
 }
-async function ownedAttachment(userId: string, t: Target, id: string) {
+export async function pendingAttachment(userId: string, t: Target, id: string) {
     await access(userId, t);
     const file = await db.getRepository(ChatAttachment).findOneBy({ id, conversationKey: room(userId, t), uploaderId: userId });
     if (!file || file.status === "deleted" || file.expiresAt <= new Date() || file.messageId) throw new ApiError("Pending attachment not found", 404);
+    if (file.status !== "pending") throw new ApiError("Attachment upload is already in progress or complete", 409);
     return file;
 }
 export async function uploadAttachment(userId: string, t: Target, id: string, body: Buffer, signal?: AbortSignal) {
     if (!Buffer.isBuffer(body)) throw new ApiError("Upload must contain binary file data", 400);
-    const file = await ownedAttachment(userId, t, id);
+    const file = await pendingAttachment(userId, t, id);
     const policy = await mediaPolicy(userId, t);
     await validateFileBytes(body, file, policy.allowedTypes);
     const repo = db.getRepository(ChatAttachment);
@@ -106,7 +112,7 @@ export async function uploadAttachment(userId: string, t: Target, id: string, bo
         if (!updated.affected) throw new ApiError("Upload cancelled", 409);
         return attachmentDto(file);
     } catch (error) {
-        await repo.update({ id, messageId: IsNull() }, { status: "deleted" });
+        await repo.update({ id, messageId: IsNull() }, { status: "deleted", expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
         // A failed delete is retried by the cleanup job; never log storage request details.
         await chatStorageService.remove(file.objectKey).catch(() => {});
         throw error;
@@ -114,8 +120,10 @@ export async function uploadAttachment(userId: string, t: Target, id: string, bo
 }
 export async function cancelAttachment(userId: string, t: Target, id: string) {
     await access(userId, t);
-    const result = await db.getRepository(ChatAttachment).update({ id, uploaderId: userId, conversationKey: room(userId, t), messageId: IsNull() }, { status: "deleted" });
+    const result = await db.getRepository(ChatAttachment).update({ id, uploaderId: userId, conversationKey: room(userId, t), messageId: IsNull() }, { status: "deleted", expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
     if (!result.affected) throw new ApiError("Only unclaimed uploads can be cancelled", 409);
+    const file = await db.getRepository(ChatAttachment).findOneBy({ id, uploaderId: userId, status: "deleted" });
+    if (file) await chatStorageService.remove(file.objectKey).catch(() => {});
     // Deletion is durable and the cleanup job retries physical removal, including in-flight PUTs.
 }
 export async function claimAttachments(m: EntityManager, userId: string, t: Target, ids: string[], messageId: string) {
@@ -133,16 +141,15 @@ export async function claimAttachments(m: EntityManager, userId: string, t: Targ
 export async function cleanupChatAttachments() {
     const repo = db.getRepository(ChatAttachment);
     // A grace period lets cancelled/in-flight object writes settle before deletion.
-    const cutoff = new Date(Date.now() - 60 * 60 * 1000);
     const files = await repo.find({ where: [
         { messageId: IsNull(), expiresAt: LessThan(new Date()) },
-        { status: "deleted", createdAt: LessThan(cutoff) },
+        { status: "deleted", expiresAt: LessThan(new Date()) },
     ], take: 100, order: { createdAt: "ASC" } });
     let removed = 0;
     for (const file of files) {
         const claimed = await repo.createQueryBuilder().update(ChatAttachment).set({ status: "deleted" })
             .where("id = :id", { id: file.id })
-            .andWhere('(status = :deleted OR ("messageId" IS NULL AND "expiresAt" < now()))', { deleted: "deleted" }).execute();
+            .andWhere('"expiresAt" < now() AND (status = :deleted OR "messageId" IS NULL)', { deleted: "deleted" }).execute();
         if (!claimed.affected) continue;
         await chatStorageService.remove(file.objectKey);
         await repo.delete({ id: file.id, status: "deleted" });
