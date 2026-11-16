@@ -1,3 +1,5 @@
+import { Notification } from "../entities/Notification";
+import { Notifications1794800000000 } from "../migrations/1794800000000-Notifications";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { User } from "../entities/User";
@@ -66,7 +68,7 @@ export const AppDataSource = new DataSource({
         }),
     synchronize: nodeEnv === "development",
     logging: false,
-    entities: [
+    entities: [Notification,
         User,
         Team,
         Project,
@@ -105,6 +107,6 @@ export const AppDataSource = new DataSource({
         MinutesOfMeeting,
         MomActionItem,
     ],
-    migrations: [ReliableChat1794700000000, ChatMedia1794700001000],
+    migrations: [Notifications1794800000000,ReliableChat1794700000000, ChatMedia1794700001000],
     subscribers: [],
 });

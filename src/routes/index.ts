@@ -1,3 +1,4 @@
+import notificationRoutes from "./notification.routes";
 import { Router } from "express";
 import authRoutes from "./auth.routes";
 import projectRoutes from "./project.routes";
@@ -19,6 +20,7 @@ import { chatRouter } from "../realtime/chat";
 const router = Router();
 router.use("/chat", chatRouter);
 
+router.use("/notifications", notificationRoutes);
 router.use("/auth", authRoutes);
 router.use("/projects", projectRoutes);
 router.use("/tasks", taskRoutes);

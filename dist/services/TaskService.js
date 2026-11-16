@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TaskService = void 0;
+const NotificationService_1 = require("./NotificationService");
 const data_source_1 = require("../config/data-source");
 const Task_1 = require("../entities/Task");
 const ActivityLog_1 = require("../entities/ActivityLog");
@@ -23,6 +24,9 @@ class TaskService {
             owner: data.ownerId ? { id: data.ownerId } : undefined
         });
         const savedTask = await this.taskRepo.save(task);
+        if (data.assignedUserId && data.assignedUserId !== data.actorId) {
+            await (0, NotificationService_1.notifyUser)(data.assignedUserId, "task.assigned", "Task assigned to you", savedTask.name).catch(error => console.error("Notification delivery failed", error));
+        }
         if (data.teamId) {
             await this.activityLogService.log({
                 action: ActivityLog_1.ActivityAction.TASK_CREATED,

@@ -4,6 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppDataSource = void 0;
+const Notification_1 = require("../entities/Notification");
+const _1794800000000_Notifications_1 = require("../migrations/1794800000000-Notifications");
 require("reflect-metadata");
 const typeorm_1 = require("typeorm");
 const User_1 = require("../entities/User");
@@ -67,7 +69,7 @@ exports.AppDataSource = new typeorm_1.DataSource({
         }),
     synchronize: nodeEnv === "development",
     logging: false,
-    entities: [
+    entities: [Notification_1.Notification,
         User_1.User,
         Team_1.Team,
         Project_1.Project,
@@ -106,6 +108,6 @@ exports.AppDataSource = new typeorm_1.DataSource({
         MinutesOfMeeting_1.MinutesOfMeeting,
         MomActionItem_1.MomActionItem,
     ],
-    migrations: [_1794700000000_ReliableChat_1.ReliableChat1794700000000, _1794700001000_ChatMedia_1.ChatMedia1794700001000],
+    migrations: [_1794800000000_Notifications_1.Notifications1794800000000, _1794700000000_ReliableChat_1.ReliableChat1794700000000, _1794700001000_ChatMedia_1.ChatMedia1794700001000],
     subscribers: [],
 });
