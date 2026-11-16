@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const ContactController_1 = require("../controllers/ContactController");
+const auth_1 = require("../middlewares/auth");
+const User_1 = require("../entities/User");
+const router = (0, express_1.Router)();
+const controller = new ContactController_1.ContactController();
+router.post("/", controller.create.bind(controller));
+router.get("/", auth_1.authenticate, (0, auth_1.authorizeRoles)(User_1.UserRole.SUPER_ADMIN, User_1.UserRole.SUDO_ADMIN), controller.list.bind(controller));
+router.patch("/:id", auth_1.authenticate, (0, auth_1.authorizeRoles)(User_1.UserRole.SUPER_ADMIN, User_1.UserRole.SUDO_ADMIN), controller.updateStatus.bind(controller));
+exports.default = router;

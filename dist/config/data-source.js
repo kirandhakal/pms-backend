@@ -35,6 +35,8 @@ const DirectMessage_1 = require("../entities/DirectMessage");
 const ProjectMember_1 = require("../entities/ProjectMember");
 const OrganizationPermission_1 = require("../entities/OrganizationPermission");
 const UserOrganization_1 = require("../entities/UserOrganization");
+const ContactSubmission_1 = require("../entities/ContactSubmission");
+const _1795000000000_ContactSubmissions_1 = require("../migrations/1795000000000-ContactSubmissions");
 // New entities
 const TeamRole_1 = require("../entities/TeamRole");
 const TeamMembership_1 = require("../entities/TeamMembership");
@@ -100,6 +102,7 @@ exports.AppDataSource = new typeorm_1.DataSource({
         ProjectMember_1.ProjectMember,
         OrganizationPermission_1.OrganizationPermission,
         UserOrganization_1.UserOrganization,
+        ContactSubmission_1.ContactSubmission,
         // New entities
         TeamRole_1.TeamRole,
         TeamMembership_1.TeamMembership,
@@ -110,6 +113,6 @@ exports.AppDataSource = new typeorm_1.DataSource({
         MinutesOfMeeting_1.MinutesOfMeeting,
         MomActionItem_1.MomActionItem,
     ],
-    migrations: [_1794900000000_ProjectManagement_1.ProjectManagement1794900000000, _1794800000000_Notifications_1.Notifications1794800000000, _1794700000000_ReliableChat_1.ReliableChat1794700000000, _1794700001000_ChatMedia_1.ChatMedia1794700001000],
+    migrations: [_1794900000000_ProjectManagement_1.ProjectManagement1794900000000, _1794800000000_Notifications_1.Notifications1794800000000, _1794700000000_ReliableChat_1.ReliableChat1794700000000, _1794700001000_ChatMedia_1.ChatMedia1794700001000, _1795000000000_ContactSubmissions_1.ContactSubmissions1795000000000],
     subscribers: [],
 });

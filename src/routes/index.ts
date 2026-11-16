@@ -14,6 +14,7 @@ import teamRoleRoutes from "./team-role.routes";
 import meetingRoutes from "./meeting.routes";
 import momRoutes from "./mom.routes";
 import publicMeetingRoutes from "./public-meeting.routes";
+import contactRoutes from "./contact.routes";
 
 import { chatRouter } from "../realtime/chat";
 
@@ -35,5 +36,6 @@ router.use(teamRoleRoutes);
 router.use("/meetings", meetingRoutes);
 router.use("/mom", momRoutes);
 router.use("/public", publicMeetingRoutes);
+router.use("/contact", contactRoutes);
 
 export default router;

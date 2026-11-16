@@ -29,6 +29,8 @@ import { DirectMessage } from "../entities/DirectMessage";
 import { ProjectMember } from "../entities/ProjectMember";
 import { OrganizationPermission } from "../entities/OrganizationPermission";
 import { UserOrganization } from "../entities/UserOrganization";
+import { ContactSubmission } from "../entities/ContactSubmission";
+import { ContactSubmissions1795000000000 } from "../migrations/1795000000000-ContactSubmissions";
 // New entities
 import { TeamRole } from "../entities/TeamRole";
 import { TeamMembership } from "../entities/TeamMembership";
@@ -99,6 +101,7 @@ export const AppDataSource = new DataSource({
         ProjectMember,
         OrganizationPermission,
         UserOrganization,
+        ContactSubmission,
         // New entities
         TeamRole,
         TeamMembership,
@@ -109,6 +112,6 @@ export const AppDataSource = new DataSource({
         MinutesOfMeeting,
         MomActionItem,
     ],
-    migrations: [ProjectManagement1794900000000, Notifications1794800000000,ReliableChat1794700000000, ChatMedia1794700001000],
+    migrations: [ProjectManagement1794900000000, Notifications1794800000000, ReliableChat1794700000000, ChatMedia1794700001000, ContactSubmissions1795000000000],
     subscribers: [],
 });
