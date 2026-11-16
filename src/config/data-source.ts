@@ -1,3 +1,5 @@
+import { ProjectDocument, ProjectDocumentLink, OrganizationResource, ResourceAllocation } from '../entities/ProjectAssets';
+import { ProjectManagement1794900000000 } from '../migrations/1794900000000-ProjectManagement';
 import { Notification } from "../entities/Notification";
 import { Notifications1794800000000 } from "../migrations/1794800000000-Notifications";
 import "reflect-metadata";
@@ -68,7 +70,7 @@ export const AppDataSource = new DataSource({
         }),
     synchronize: nodeEnv === "development",
     logging: false,
-    entities: [Notification,
+    entities: [ProjectDocument, ProjectDocumentLink, OrganizationResource, ResourceAllocation, Notification,
         User,
         Team,
         Project,
@@ -107,6 +109,6 @@ export const AppDataSource = new DataSource({
         MinutesOfMeeting,
         MomActionItem,
     ],
-    migrations: [Notifications1794800000000,ReliableChat1794700000000, ChatMedia1794700001000],
+    migrations: [ProjectManagement1794900000000, Notifications1794800000000,ReliableChat1794700000000, ChatMedia1794700001000],
     subscribers: [],
 });

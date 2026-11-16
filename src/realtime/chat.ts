@@ -1,3 +1,4 @@
+import { projectAccess, taskAccess } from '../services/ProjectAccess';
 import { Server as HttpServer } from "http";
 import { Server } from "socket.io";
 import { Router } from "express";
@@ -54,14 +55,9 @@ export async function access(userId: string, t: ChatTarget, m: EntityManager = d
         const member = await m.findOneBy(ChannelMember, { channelId: t.id, userId });
         if (!c || c.teamId !== u?.team?.id || (c.type !== ChannelType.PUBLIC && !member)) throw new ApiError("Channel access denied", 403);
     } else if (t.kind === "project") {
-        const p = await m.findOneBy(Project, { id: t.id });
-        if (!p || (p.managerId !== userId && p.teamLeadId !== userId && !await m.findOneBy(ProjectMember, { projectId: t.id, userId }))) throw new ApiError("Project access denied", 403);
+        await projectAccess(userId, t.id, undefined, m);
     } else {
-        const task = await m.findOneBy(Task, { id: t.id });
-        if (!task) throw new ApiError("Task not found", 404);
-        if ([task.assigneeId, task.createdById, task.ownerId].includes(userId)) return;
-        if (task.projectId) return access(userId, { kind: "project", id: task.projectId }, m);
-        throw new ApiError("Task access denied", 403);
+        await taskAccess(userId, t.id, m);
     }
 }
 function entity(t: ChatTarget) {

@@ -4,12 +4,72 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WorklogController = void 0;
+const data_source_1 = require("../config/data-source");
+const Project_1 = require("../entities/Project");
+const Task_1 = require("../entities/Task");
+const ProjectAccess_1 = require("../services/ProjectAccess");
+const errorHandler_1 = require("../middlewares/errorHandler");
+async function scopedLogs(req, logs) {
+    const org = req.get('X-Organization-Id') || req.user?.organizationId || req.user?.teamId;
+    if (!org)
+        throw new errorHandler_1.ApiError('Organization context required', 400);
+    await (0, ProjectAccess_1.organizationAccess)(req.user.id, org);
+    const permitted = [];
+    for (const row of logs) {
+        try {
+            const project = row.projectId ? await data_source_1.AppDataSource.getRepository(Project_1.Project).findOneBy({ id: row.projectId }) : row.workflowId ? await data_source_1.AppDataSource.getRepository(Project_1.Project).findOneBy({ workflowId: row.workflowId }) : null;
+            if (project) {
+                const a = await (0, ProjectAccess_1.projectAccess)(req.user.id, project.id, org);
+                if (row.taskId)
+                    await (0, ProjectAccess_1.taskAccess)(req.user.id, row.taskId);
+                else if (!a.manage && row.userId !== req.user.id)
+                    continue;
+            }
+            else if (row.userId !== req.user.id)
+                continue;
+            if (row.taskId)
+                await (0, ProjectAccess_1.taskAccess)(req.user.id, row.taskId);
+            permitted.push(row);
+        }
+        catch (e) {
+            if (!(e instanceof errorHandler_1.ApiError) || ![403, 404].includes(e.statusCode))
+                throw e;
+        }
+    }
+    return permitted;
+}
+async function validateWorklogTarget(req) {
+    if (req.body.userId && req.body.userId !== req.user.id)
+        throw new errorHandler_1.ApiError('Log time only for yourself', 403);
+    const org = req.get('X-Organization-Id') || req.user?.organizationId || req.user?.teamId;
+    if (req.body.projectId)
+        await (0, ProjectAccess_1.projectAccess)(req.user.id, req.body.projectId, org);
+    if (req.body.workflowId) {
+        const p = await data_source_1.AppDataSource.getRepository(Project_1.Project).findOneBy({ workflowId: req.body.workflowId });
+        if (!p)
+            throw new errorHandler_1.ApiError('Project workflow required', 400);
+        await (0, ProjectAccess_1.projectAccess)(req.user.id, p.id, org);
+        if (req.body.projectId && p.id !== req.body.projectId)
+            throw new errorHandler_1.ApiError('Project/workflow mismatch', 400);
+    }
+    if (req.body.taskId) {
+        await (0, ProjectAccess_1.taskAccess)(req.user.id, req.body.taskId);
+        const t = await data_source_1.AppDataSource.getRepository(Task_1.Task).findOneByOrFail({ id: req.body.taskId });
+        if (req.body.projectId && t.projectId !== req.body.projectId)
+            throw new errorHandler_1.ApiError('Project/task mismatch', 400);
+        if (req.body.workflowId && t.workflowId !== req.body.workflowId)
+            throw new errorHandler_1.ApiError('Workflow/task mismatch', 400);
+    }
+    if (req.body.hours !== undefined && (!Number.isFinite(req.body.hours) || req.body.hours < 0 || req.body.hours > 24))
+        throw new errorHandler_1.ApiError('Hours must be between 0 and 24', 400);
+}
 const exceljs_1 = __importDefault(require("exceljs"));
 const WorklogService_1 = require("../services/WorklogService");
 class WorklogController {
     async listByProject(req, res) {
         try {
-            const worklogs = await WorklogService_1.worklogService.getByProject(String(req.params.projectId));
+            await (0, ProjectAccess_1.projectAccess)(req.user.id, String(req.params.projectId), req.get('X-Organization-Id'));
+            const worklogs = await scopedLogs(req, await WorklogService_1.worklogService.getByProject(String(req.params.projectId)));
             res.json({ data: worklogs });
         }
         catch (err) {
@@ -19,7 +79,7 @@ class WorklogController {
     async listByUser(req, res) {
         try {
             const userId = req.query.userId || req.user.id;
-            const worklogs = await WorklogService_1.worklogService.getByUser(userId);
+            const worklogs = await scopedLogs(req, await WorklogService_1.worklogService.getByUser(userId));
             res.json({ data: worklogs });
         }
         catch (err) {
@@ -28,6 +88,7 @@ class WorklogController {
     }
     async create(req, res) {
         try {
+            await validateWorklogTarget(req);
             const worklog = await WorklogService_1.worklogService.createManual({
                 ...req.body,
                 userId: req.body.userId || req.user.id,
@@ -40,6 +101,10 @@ class WorklogController {
     }
     async confirmCompletion(req, res) {
         try {
+            await validateWorklogTarget(req);
+            const task = await data_source_1.AppDataSource.getRepository(Task_1.Task).findOneByOrFail({ id: req.body.taskId });
+            if (task.assigneeId !== req.user.id)
+                throw new errorHandler_1.ApiError("Only the assignee can confirm their logged time", 403);
             const worklog = await WorklogService_1.worklogService.confirmCompletion({
                 taskId: req.body.taskId,
                 userId: req.body.userId || req.user.id,
@@ -69,7 +134,7 @@ class WorklogController {
     async listAll(req, res) {
         try {
             const filter = buildFilter(req);
-            const worklogs = await WorklogService_1.worklogService.listForManagement(filter);
+            const worklogs = await scopedLogs(req, await WorklogService_1.worklogService.listForManagement(filter));
             res.json({ data: worklogs });
         }
         catch (err) {
@@ -79,7 +144,7 @@ class WorklogController {
     async exportExcel(req, res) {
         try {
             const filter = buildFilter(req);
-            const worklogs = await WorklogService_1.worklogService.listForManagement(filter);
+            const worklogs = await scopedLogs(req, await WorklogService_1.worklogService.listForManagement(filter));
             const workbook = new exceljs_1.default.Workbook();
             workbook.creator = "PMS";
             workbook.created = new Date();

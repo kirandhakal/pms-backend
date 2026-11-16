@@ -1,3 +1,34 @@
+import { AppDataSource as db } from '../config/data-source';
+import { Project } from '../entities/Project';
+import { Task } from '../entities/Task';
+import { Worklog } from '../entities/Worklog';
+import { projectAccess, taskAccess, organizationAccess } from '../services/ProjectAccess';
+import { ApiError } from '../middlewares/errorHandler';
+
+async function scopedLogs(req: AuthRequest, logs: Worklog[]) {
+ const org=req.get('X-Organization-Id') || req.user?.organizationId || req.user?.teamId;
+ if(!org) throw new ApiError('Organization context required',400);
+ await organizationAccess(req.user!.id,org);
+ const permitted=[];
+ for(const row of logs) {
+  try {
+   const project=row.projectId?await db.getRepository(Project).findOneBy({id:row.projectId}):row.workflowId?await db.getRepository(Project).findOneBy({workflowId:row.workflowId}):null;
+   if(project){const a=await projectAccess(req.user!.id,project.id,org);if(row.taskId)await taskAccess(req.user!.id,row.taskId);else if(!a.manage && row.userId!==req.user!.id)continue;}
+   else if(row.userId!==req.user!.id)continue;
+   if(row.taskId)await taskAccess(req.user!.id,row.taskId);
+   permitted.push(row);
+  }catch(e){if(!(e instanceof ApiError)||![403,404].includes(e.statusCode))throw e;}
+ }
+ return permitted;
+}
+async function validateWorklogTarget(req:AuthRequest) {
+ if(req.body.userId && req.body.userId!==req.user!.id) throw new ApiError('Log time only for yourself',403);
+ const org=req.get('X-Organization-Id')||req.user?.organizationId||req.user?.teamId;
+ if(req.body.projectId)await projectAccess(req.user!.id,req.body.projectId,org);
+ if(req.body.workflowId){const p=await db.getRepository(Project).findOneBy({workflowId:req.body.workflowId});if(!p)throw new ApiError('Project workflow required',400);await projectAccess(req.user!.id,p.id,org);if(req.body.projectId && p.id!==req.body.projectId)throw new ApiError('Project/workflow mismatch',400);}
+ if(req.body.taskId){await taskAccess(req.user!.id,req.body.taskId);const t=await db.getRepository(Task).findOneByOrFail({id:req.body.taskId});if(req.body.projectId&&t.projectId!==req.body.projectId)throw new ApiError('Project/task mismatch',400);if(req.body.workflowId&&t.workflowId!==req.body.workflowId)throw new ApiError('Workflow/task mismatch',400);}
+ if(req.body.hours!==undefined&&(!Number.isFinite(req.body.hours)||req.body.hours<0||req.body.hours>24))throw new ApiError('Hours must be between 0 and 24',400);
+}
 import { Response } from "express";
 import ExcelJS from "exceljs";
 import { AuthRequest } from "../middlewares/auth";
@@ -7,7 +38,8 @@ import { worklogService, WorklogFilter } from "../services/WorklogService";
 export class WorklogController {
     async listByProject(req: AuthRequest, res: Response) {
         try {
-            const worklogs = await worklogService.getByProject(String(req.params.projectId));
+            await projectAccess(req.user!.id,String(req.params.projectId),req.get('X-Organization-Id'));
+            const worklogs = await scopedLogs(req, await worklogService.getByProject(String(req.params.projectId)));
             res.json({ data: worklogs });
         } catch (err: any) {
             res.status(err.statusCode || 500).json({ message: err.message });
@@ -17,7 +49,7 @@ export class WorklogController {
     async listByUser(req: AuthRequest, res: Response) {
         try {
             const userId = (req.query.userId as string) || req.user!.id;
-            const worklogs = await worklogService.getByUser(userId);
+            const worklogs = await scopedLogs(req, await worklogService.getByUser(userId));
             res.json({ data: worklogs });
         } catch (err: any) {
             res.status(err.statusCode || 500).json({ message: err.message });
@@ -26,6 +58,7 @@ export class WorklogController {
 
     async create(req: AuthRequest, res: Response) {
         try {
+            await validateWorklogTarget(req);
             const worklog = await worklogService.createManual({
                 ...req.body,
                 userId: req.body.userId || req.user!.id,
@@ -38,6 +71,9 @@ export class WorklogController {
 
     async confirmCompletion(req: AuthRequest, res: Response) {
         try {
+            await validateWorklogTarget(req);
+            const task = await db.getRepository(Task).findOneByOrFail({id:req.body.taskId});
+            if(task.assigneeId !== req.user!.id)throw new ApiError("Only the assignee can confirm their logged time",403);
             const worklog = await worklogService.confirmCompletion({
                 taskId: req.body.taskId,
                 userId: req.body.userId || req.user!.id,
@@ -71,7 +107,7 @@ export class WorklogController {
     async listAll(req: PermissionRequest, res: Response) {
         try {
             const filter = buildFilter(req);
-            const worklogs = await worklogService.listForManagement(filter);
+            const worklogs = await scopedLogs(req, await worklogService.listForManagement(filter));
             res.json({ data: worklogs });
         } catch (err: any) {
             res.status(err.statusCode || 500).json({ message: err.message });
@@ -81,7 +117,7 @@ export class WorklogController {
     async exportExcel(req: PermissionRequest, res: Response) {
         try {
             const filter = buildFilter(req);
-            const worklogs = await worklogService.listForManagement(filter);
+            const worklogs = await scopedLogs(req, await worklogService.listForManagement(filter));
 
             const workbook = new ExcelJS.Workbook();
             workbook.creator = "PMS";

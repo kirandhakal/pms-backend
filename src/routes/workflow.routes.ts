@@ -1,3 +1,9 @@
+import { AppDataSource as db } from '../config/data-source';
+import { Project } from '../entities/Project';
+import { Workflow } from '../entities/Workflow';
+import { WorkflowStage } from '../entities/WorkflowStage';
+import { projectAccess, organizationAccess, requireManagement, visibleStages, projectTasks } from '../services/ProjectAccess';
+import { ApiError } from '../middlewares/errorHandler';
 import { Router } from "express";
 import { authenticate } from "../middlewares/auth";
 import { authorize, loadPermissions } from "../middlewares/permission";
@@ -11,6 +17,45 @@ import { z } from "zod";
 import { TenantRequest } from "../middlewares/tenantResolver";
 
 const router = Router();
+router.use(authenticate);
+router.use(async (req, res, next) => {
+ try {
+  const parts=req.path.split('/').filter(Boolean);
+  if(!parts[0] || parts[0]==='default') {
+   const orgId=req.get('X-Organization-Id')||req.user?.organizationId||req.user?.teamId;
+   if(!orgId)throw new ApiError('Organization context required',400);
+   await organizationAccess(req.user!.id,orgId);
+   if(req.method==='GET'&&!parts[0]) {
+    const workflows=await db.getRepository(Workflow).find({where:{organizationId:orgId,isActive:true}});
+    const result=[];
+    for(const w of workflows) {
+     const p=await db.getRepository(Project).findOneBy({workflowId:w.id});
+     if(!p){result.push(w);continue;}
+     try{const a=await projectAccess(req.user!.id,p.id,orgId);result.push({...w,stages:await visibleStages(a,req.user!.id)});}catch(e){if(!(e instanceof ApiError)||![403,404].includes(e.statusCode))throw e;}
+    }
+    return res.json({data:result});
+   }
+   return next();
+  }
+  if(!z.uuid().safeParse(parts[0]).success)return next();
+  const p=await db.getRepository(Project).findOneBy({workflowId:parts[0]});
+  if(!p)return next();
+  const a=await projectAccess(req.user!.id,p.id,req.get('X-Organization-Id'));
+  if(parts[1]==='stages'&&parts[2]&&parts[2]!=='reorder') {
+   const stage=await db.getRepository(WorkflowStage).findOneBy({id:parts[2],workflowId:parts[0]});
+   if(!stage)throw new ApiError('Stage not found in this workflow',404);
+  }
+  if(req.method!=='GET')requireManagement(a);
+  else {
+   const stages=await visibleStages(a,req.user!.id);
+   if(parts.length===1)return res.json({data:{id:p.workflowId,name:p.name+' Workflow',stages}});
+   if(parts[1]==='visible-stages')return res.json({data:stages});
+   if(parts[1]==='stats') {const tasks=await projectTasks(a,req.user!.id);return res.json({data:stages.map(s=>({stageId:s.id,name:s.name,taskCount:tasks.filter(t=>t.stageId===s.id).length,completedCount:tasks.filter(t=>t.stageId===s.id&&t.status==='Done').length}))});}
+   if(parts[1]==='stages'&&parts[2]&&!stages.some(s=>s.id===parts[2]))throw new ApiError('Stage access denied',403);
+  }
+  next();
+ }catch(e){next(e);}
+});
 
 // Validation schemas
 const createWorkflowSchema = z.object({

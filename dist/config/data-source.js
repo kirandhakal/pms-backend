@@ -4,6 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppDataSource = void 0;
+const ProjectAssets_1 = require("../entities/ProjectAssets");
+const _1794900000000_ProjectManagement_1 = require("../migrations/1794900000000-ProjectManagement");
 const Notification_1 = require("../entities/Notification");
 const _1794800000000_Notifications_1 = require("../migrations/1794800000000-Notifications");
 require("reflect-metadata");
@@ -69,7 +71,7 @@ exports.AppDataSource = new typeorm_1.DataSource({
         }),
     synchronize: nodeEnv === "development",
     logging: false,
-    entities: [Notification_1.Notification,
+    entities: [ProjectAssets_1.ProjectDocument, ProjectAssets_1.ProjectDocumentLink, ProjectAssets_1.OrganizationResource, ProjectAssets_1.ResourceAllocation, Notification_1.Notification,
         User_1.User,
         Team_1.Team,
         Project_1.Project,
@@ -108,6 +110,6 @@ exports.AppDataSource = new typeorm_1.DataSource({
         MinutesOfMeeting_1.MinutesOfMeeting,
         MomActionItem_1.MomActionItem,
     ],
-    migrations: [_1794800000000_Notifications_1.Notifications1794800000000, _1794700000000_ReliableChat_1.ReliableChat1794700000000, _1794700001000_ChatMedia_1.ChatMedia1794700001000],
+    migrations: [_1794900000000_ProjectManagement_1.ProjectManagement1794900000000, _1794800000000_Notifications_1.Notifications1794800000000, _1794700000000_ReliableChat_1.ReliableChat1794700000000, _1794700001000_ChatMedia_1.ChatMedia1794700001000],
     subscribers: [],
 });

@@ -1,5 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const data_source_1 = require("../config/data-source");
+const Project_1 = require("../entities/Project");
+const Workflow_1 = require("../entities/Workflow");
+const WorkflowStage_1 = require("../entities/WorkflowStage");
+const ProjectAccess_1 = require("../services/ProjectAccess");
+const errorHandler_1 = require("../middlewares/errorHandler");
 const express_1 = require("express");
 const auth_1 = require("../middlewares/auth");
 const permission_1 = require("../middlewares/permission");
@@ -11,6 +17,69 @@ const WorkflowEngine_1 = require("../services/WorkflowEngine");
 const validate_1 = require("../middlewares/validate");
 const zod_1 = require("zod");
 const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.use(async (req, res, next) => {
+    try {
+        const parts = req.path.split('/').filter(Boolean);
+        if (!parts[0] || parts[0] === 'default') {
+            const orgId = req.get('X-Organization-Id') || req.user?.organizationId || req.user?.teamId;
+            if (!orgId)
+                throw new errorHandler_1.ApiError('Organization context required', 400);
+            await (0, ProjectAccess_1.organizationAccess)(req.user.id, orgId);
+            if (req.method === 'GET' && !parts[0]) {
+                const workflows = await data_source_1.AppDataSource.getRepository(Workflow_1.Workflow).find({ where: { organizationId: orgId, isActive: true } });
+                const result = [];
+                for (const w of workflows) {
+                    const p = await data_source_1.AppDataSource.getRepository(Project_1.Project).findOneBy({ workflowId: w.id });
+                    if (!p) {
+                        result.push(w);
+                        continue;
+                    }
+                    try {
+                        const a = await (0, ProjectAccess_1.projectAccess)(req.user.id, p.id, orgId);
+                        result.push({ ...w, stages: await (0, ProjectAccess_1.visibleStages)(a, req.user.id) });
+                    }
+                    catch (e) {
+                        if (!(e instanceof errorHandler_1.ApiError) || ![403, 404].includes(e.statusCode))
+                            throw e;
+                    }
+                }
+                return res.json({ data: result });
+            }
+            return next();
+        }
+        if (!zod_1.z.uuid().safeParse(parts[0]).success)
+            return next();
+        const p = await data_source_1.AppDataSource.getRepository(Project_1.Project).findOneBy({ workflowId: parts[0] });
+        if (!p)
+            return next();
+        const a = await (0, ProjectAccess_1.projectAccess)(req.user.id, p.id, req.get('X-Organization-Id'));
+        if (parts[1] === 'stages' && parts[2] && parts[2] !== 'reorder') {
+            const stage = await data_source_1.AppDataSource.getRepository(WorkflowStage_1.WorkflowStage).findOneBy({ id: parts[2], workflowId: parts[0] });
+            if (!stage)
+                throw new errorHandler_1.ApiError('Stage not found in this workflow', 404);
+        }
+        if (req.method !== 'GET')
+            (0, ProjectAccess_1.requireManagement)(a);
+        else {
+            const stages = await (0, ProjectAccess_1.visibleStages)(a, req.user.id);
+            if (parts.length === 1)
+                return res.json({ data: { id: p.workflowId, name: p.name + ' Workflow', stages } });
+            if (parts[1] === 'visible-stages')
+                return res.json({ data: stages });
+            if (parts[1] === 'stats') {
+                const tasks = await (0, ProjectAccess_1.projectTasks)(a, req.user.id);
+                return res.json({ data: stages.map(s => ({ stageId: s.id, name: s.name, taskCount: tasks.filter(t => t.stageId === s.id).length, completedCount: tasks.filter(t => t.stageId === s.id && t.status === 'Done').length })) });
+            }
+            if (parts[1] === 'stages' && parts[2] && !stages.some(s => s.id === parts[2]))
+                throw new errorHandler_1.ApiError('Stage access denied', 403);
+        }
+        next();
+    }
+    catch (e) {
+        next(e);
+    }
+});
 // Validation schemas
 const createWorkflowSchema = zod_1.z.object({
     name: zod_1.z.string().min(2).max(100),

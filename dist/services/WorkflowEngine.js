@@ -247,7 +247,7 @@ class WorkflowEngine {
             throw new errorHandler_1.ApiError("Task not found", 404);
         }
         const toStage = await this.stageRepo.findOne({ where: { id: toStageId } });
-        if (!toStage) {
+        if (!toStage || !toStage.isActive || toStage.workflowId !== task.workflowId) {
             throw new errorHandler_1.ApiError("Target stage not found", 404);
         }
         // Validate transition
@@ -270,11 +270,13 @@ class WorkflowEngine {
         }
         else if (toStage.isDefault) {
             task.status = Task_1.TaskStatus.TODO;
-            task.completedAt = undefined;
+            task.completedAt = null;
+            task.completionPercentage = 0;
         }
         else {
             task.status = Task_1.TaskStatus.IN_PROGRESS;
-            task.completedAt = undefined;
+            task.completedAt = null;
+            task.completionPercentage = 0;
         }
         const savedTask = await this.taskRepo.save(task);
         // Execute onEnter hook for new stage

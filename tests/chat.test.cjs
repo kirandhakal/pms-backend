@@ -30,7 +30,8 @@ test('private channel requires explicit membership even within a team',async()=>
  await access(a,{kind:'channel',id:b},m);
 });
 test('project discussion rejects outsiders and permits project managers',async()=>{
- const m={findOneBy:async entity=>entity===Project?{managerId:b}:null};
+ const {Team}=require('../dist/entities/Team');
+ const m={findOne:async()=>({id:b,isActive:true,team:{id:'org'}}),findOneBy:async entity=>entity===Project?{id:b,teamId:'org',managerId:b}:entity===Team?{id:'org'}:null};
  await assert.rejects(access(a,{kind:'project',id:b},m),e=>e.statusCode===403);
  await access(b,{kind:'project',id:b},m);
 });

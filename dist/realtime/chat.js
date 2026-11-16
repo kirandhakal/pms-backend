@@ -10,6 +10,7 @@ exports.changes = changes;
 exports.send = send;
 exports.changeMessage = changeMessage;
 exports.attachChat = attachChat;
+const ProjectAccess_1 = require("../services/ProjectAccess");
 const socket_io_1 = require("socket.io");
 const express_1 = require("express");
 const zod_1 = require("zod");
@@ -20,9 +21,6 @@ const errorHandler_1 = require("../middlewares/errorHandler");
 const Channel_1 = require("../entities/Channel");
 const ChannelMember_1 = require("../entities/ChannelMember");
 const Friendship_1 = require("../entities/Friendship");
-const Project_1 = require("../entities/Project");
-const ProjectMember_1 = require("../entities/ProjectMember");
-const Task_1 = require("../entities/Task");
 const User_1 = require("../entities/User");
 const DirectMessage_1 = require("../entities/DirectMessage");
 const ChannelMessage_1 = require("../entities/ChannelMessage");
@@ -70,19 +68,10 @@ async function access(userId, t, m = data_source_1.AppDataSource.manager) {
             throw new errorHandler_1.ApiError("Channel access denied", 403);
     }
     else if (t.kind === "project") {
-        const p = await m.findOneBy(Project_1.Project, { id: t.id });
-        if (!p || (p.managerId !== userId && p.teamLeadId !== userId && !await m.findOneBy(ProjectMember_1.ProjectMember, { projectId: t.id, userId })))
-            throw new errorHandler_1.ApiError("Project access denied", 403);
+        await (0, ProjectAccess_1.projectAccess)(userId, t.id, undefined, m);
     }
     else {
-        const task = await m.findOneBy(Task_1.Task, { id: t.id });
-        if (!task)
-            throw new errorHandler_1.ApiError("Task not found", 404);
-        if ([task.assigneeId, task.createdById, task.ownerId].includes(userId))
-            return;
-        if (task.projectId)
-            return access(userId, { kind: "project", id: task.projectId }, m);
-        throw new errorHandler_1.ApiError("Task access denied", 403);
+        await (0, ProjectAccess_1.taskAccess)(userId, t.id, m);
     }
 }
 function entity(t) {

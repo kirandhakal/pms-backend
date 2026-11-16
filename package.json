@@ -14,7 +14,9 @@
     "typeorm": "typeorm",
     "test:chat": "npm run build && node tests/chat.test.cjs && node tests/chat-media.test.cjs",
     "migration:run": "npm run build && typeorm migration:run -d dist/config/data-source.js",
-    "cleanup:chat-attachments": "node dist/scripts/cleanup-chat-attachments.js"
+    "cleanup:chat-attachments": "node dist/scripts/cleanup-chat-attachments.js",
+    "test:projects": "npm run build && node --test tests/projects.test.cjs",
+    "cleanup:project-documents": "node dist/scripts/cleanup-project-documents.js"
   },
   "keywords": [],
   "author": "",

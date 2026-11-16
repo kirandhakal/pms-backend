@@ -54,7 +54,7 @@ class TaskService {
             task.completionPercentage = 100;
         }
         else if (previousStatus === Task_1.TaskStatus.DONE) {
-            task.completedAt = undefined;
+            task.completedAt = null;
         }
         if (status === Task_1.TaskStatus.IN_PROGRESS && !task.startDate) {
             task.startDate = new Date();

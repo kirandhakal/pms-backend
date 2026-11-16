@@ -333,7 +333,7 @@ export class WorkflowEngine {
 
         const toStage = await this.stageRepo.findOne({ where: { id: toStageId } });
 
-        if (!toStage) {
+        if (!toStage || !toStage.isActive || toStage.workflowId !== task.workflowId) {
             throw new ApiError("Target stage not found", 404);
         }
 
@@ -360,10 +360,12 @@ export class WorkflowEngine {
             task.completionPercentage = 100;
         } else if (toStage.isDefault) {
             task.status = TaskStatus.TODO;
-            task.completedAt = undefined;
+            task.completedAt = null;
+            task.completionPercentage = 0;
         } else {
             task.status = TaskStatus.IN_PROGRESS;
-            task.completedAt = undefined;
+            task.completedAt = null;
+            task.completionPercentage = 0;
         }
 
         const savedTask = await this.taskRepo.save(task);

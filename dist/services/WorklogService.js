@@ -26,7 +26,7 @@ class WorklogService {
             order: { createdAt: "ASC" },
         });
         let startedAt = task.startDate;
-        let doneAt = task.completedAt;
+        let doneAt = task.completedAt || undefined;
         for (const activity of activities) {
             if (!startedAt && activity.type === TaskActivity_1.TaskActivityType.STAGE_CHANGED) {
                 const toName = (activity.details?.toStageName || "").toLowerCase();

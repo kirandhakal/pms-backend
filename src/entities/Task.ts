@@ -138,7 +138,7 @@ export class Task {
     startDate?: Date;
 
     @Column({ type: "timestamp", nullable: true })
-    completedAt?: Date;
+    completedAt?: Date | null;
 
     // Order within stage (for drag-drop)
     @Column({ type: "int", default: 0 })
