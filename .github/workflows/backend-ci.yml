@@ -53,7 +53,6 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
           source: docker-compose.prod.yml
           target: ${{ env.DEPLOY_PATH }}
       - uses: appleboy/ssh-action@v1.2.0
@@ -65,7 +64,6 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
           envs: IMAGE,IMAGE_TAG,DEPLOY_PATH
           command_timeout: 15m
           script: |

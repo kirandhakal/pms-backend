@@ -14,7 +14,6 @@ Configure these GitHub repository secrets:
 
 - `DOCKER_HUB_USERNAME`, `DOCKER_HUB_ACCESS_TOKEN` (write access to the image repository)
 - `HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`
-- `SSH_HOST_FINGERPRINT` (verified SHA256 host key fingerprint)
 
 The workflow uses the `production` GitHub environment. Configure its protection rules as desired. Change `IMAGE` and `DEPLOY_PATH` in the workflow if necessary. SSH uses port 22.
 
