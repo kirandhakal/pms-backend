@@ -1,0 +1,23 @@
+name: kanban
+services:
+  backend:
+    image: ${IMAGE:-kirandhakal/pms-backend}:${IMAGE_TAG:?Set IMAGE_TAG to a commit SHA}
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+    ports:
+      - "127.0.0.1:${HOST_PORT:-3001}:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3001/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

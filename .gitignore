@@ -27,3 +27,6 @@ COMPLETION_FEATURES.md
 FEATURES.md
 *.md
 !docs/CHAT.md
+
+.env.docker
+!docs/DEPLOYMENT.md

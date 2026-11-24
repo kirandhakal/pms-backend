@@ -21,6 +21,15 @@ app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)());
 app.use((0, morgan_1.default)("dev"));
 app.use(express_1.default.json());
+app.get("/health/ready", async (_req, res) => {
+    try {
+        await data_source_1.AppDataSource.query("SELECT 1");
+        res.status(200).json({ status: "ready" });
+    }
+    catch {
+        res.status(503).json({ status: "unavailable" });
+    }
+});
 app.use("/api", routes_1.default);
 app.use(errorHandler_1.notFoundHandler);
 app.use(errorHandler_1.errorHandler);
@@ -35,4 +44,5 @@ data_source_1.AppDataSource.initialize()
 })
     .catch((err) => {
     console.error("Error during Data Source initialization", err);
+    process.exitCode = 1;
 });

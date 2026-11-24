@@ -1,7 +1,7 @@
 # Multi-stage build for production-ready Docker image
 
 # Build stage
-FROM node:20.18.0-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Install security updates and required system dependencies
 RUN apk update && apk upgrade && \
@@ -25,7 +25,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:20.18.0-alpine AS production
+FROM node:22-alpine AS production
 
 # Install security updates and dumb-init for proper signal handling
 RUN apk update && apk upgrade && \

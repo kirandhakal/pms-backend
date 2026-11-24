@@ -20,6 +20,15 @@ app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
 
+app.get("/health/ready", async (_req, res) => {
+    try {
+        await AppDataSource.query("SELECT 1");
+        res.status(200).json({ status: "ready" });
+    } catch {
+        res.status(503).json({ status: "unavailable" });
+    }
+});
+
 app.use("/api", routes);
 app.use(notFoundHandler);
 app.use(errorHandler);
@@ -35,4 +44,5 @@ AppDataSource.initialize()
     })
     .catch((err) => {
         console.error("Error during Data Source initialization", err);
+        process.exitCode = 1;
     });
