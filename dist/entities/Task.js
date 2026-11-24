@@ -152,7 +152,7 @@ __decorate([
 ], Task.prototype, "startDate", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "timestamp", nullable: true }),
-    __metadata("design:type", Date)
+    __metadata("design:type", Object)
 ], Task.prototype, "completedAt", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "int", default: 0 }),

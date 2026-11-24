@@ -1,4 +1,6 @@
 import "reflect-metadata";
+import { createServer } from "http";
+import { attachChat } from "./realtime/chat";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -25,7 +27,9 @@ app.use(errorHandler);
 AppDataSource.initialize()
     .then(() => {
         console.log("Data Source has been initialized!");
-        app.listen(PORT, () => {
+        const server = createServer(app);
+        attachChat(server);
+        server.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
         });
     })

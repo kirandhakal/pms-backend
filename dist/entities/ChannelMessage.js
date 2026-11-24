@@ -17,6 +17,34 @@ let ChannelMessage = class ChannelMessage {
 };
 exports.ChannelMessage = ChannelMessage;
 __decorate([
+    (0, typeorm_1.Column)({ type: "bigint", default: "0" }),
+    __metadata("design:type", String)
+], ChannelMessage.prototype, "chatVersion", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", Object)
+], ChannelMessage.prototype, "replyToMessageId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "timestamptz", nullable: true }),
+    __metadata("design:type", Object)
+], ChannelMessage.prototype, "pinnedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", Object)
+], ChannelMessage.prototype, "pinnedById", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" }),
+    __metadata("design:type", Date)
+], ChannelMessage.prototype, "chatUpdatedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", String)
+], ChannelMessage.prototype, "clientMessageId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "bigint", generated: "increment" }),
+    __metadata("design:type", String)
+], ChannelMessage.prototype, "chatSequence", void 0);
+__decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
     __metadata("design:type", String)
 ], ChannelMessage.prototype, "id", void 0);
@@ -56,5 +84,6 @@ __decorate([
     __metadata("design:type", Date)
 ], ChannelMessage.prototype, "updatedAt", void 0);
 exports.ChannelMessage = ChannelMessage = __decorate([
-    (0, typeorm_1.Entity)("channel_messages")
+    (0, typeorm_1.Entity)("channel_messages"),
+    (0, typeorm_1.Index)(["channelId", "userId", "clientMessageId"], { unique: true })
 ], ChannelMessage);

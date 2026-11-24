@@ -107,6 +107,7 @@ export class User {
     preferences?: {
         theme?: "light" | "dark" | "system";
         notifications?: boolean;
+        mutedNotificationTypes?: string[];
         language?: string;
     };
 

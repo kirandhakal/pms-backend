@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.channelService = exports.ChannelService = void 0;
+const chat_1 = require("../realtime/chat");
+const crypto_1 = require("crypto");
 const data_source_1 = require("../config/data-source");
 const Channel_1 = require("../entities/Channel");
 const ChannelMember_1 = require("../entities/ChannelMember");
@@ -22,6 +24,7 @@ class ChannelService {
         return user;
     }
     async canAccessChannel(userId, channel) {
+        await this.ensureTeamMember(userId, channel.teamId);
         if (channel.type === Channel_1.ChannelType.PUBLIC) {
             return true;
         }
@@ -99,31 +102,15 @@ class ChannelService {
             order: { createdAt: "ASC" },
         });
     }
-    async sendMessage(userId, channelId, body) {
-        const channel = await this.channelRepo.findOne({ where: { id: channelId } });
-        if (!channel || !channel.isActive) {
-            throw new errorHandler_1.ApiError("Channel not found", 404);
-        }
-        if (!(await this.canAccessChannel(userId, channel))) {
-            throw new errorHandler_1.ApiError("You do not have access to this channel", 403);
-        }
-        const membership = await this.memberRepo.findOne({ where: { channelId, userId } });
-        if (membership?.isMuted) {
-            throw new errorHandler_1.ApiError("Channel is muted", 400);
-        }
-        const message = this.messageRepo.create({ channelId, userId, body: body.trim() });
-        return this.messageRepo.save(message);
+    async sendMessage(userId, channelId, body, clientMessageId = (0, crypto_1.randomUUID)()) {
+        return (0, chat_1.send)(userId, { kind: "channel", id: channelId, body, clientMessageId });
     }
     async deleteMessage(userId, messageId) {
         const message = await this.messageRepo.findOne({ where: { id: messageId } });
         if (!message) {
             throw new errorHandler_1.ApiError("Message not found", 404);
         }
-        if (message.userId !== userId) {
-            throw new errorHandler_1.ApiError("You can only delete your own messages", 403);
-        }
-        message.isDeleted = true;
-        await this.messageRepo.save(message);
+        await (0, chat_1.changeMessage)(userId, { kind: "channel", id: message.channelId, messageId, action: "remove" });
     }
     async setMute(userId, channelId, isMuted) {
         const channel = await this.channelRepo.findOne({ where: { id: channelId } });

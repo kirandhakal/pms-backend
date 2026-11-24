@@ -73,7 +73,8 @@ export class FriendController {
             const message = await friendService.sendDirectMessage(
                 req.user!.id,
                 req.body.recipientId,
-                req.body.body
+                req.body.body,
+                req.body.clientMessageId
             );
             res.status(201).json({ data: message });
         } catch (err: any) {

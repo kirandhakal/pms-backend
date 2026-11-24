@@ -16,6 +16,34 @@ let DirectMessage = class DirectMessage {
 };
 exports.DirectMessage = DirectMessage;
 __decorate([
+    (0, typeorm_1.Column)({ type: "bigint", default: "0" }),
+    __metadata("design:type", String)
+], DirectMessage.prototype, "chatVersion", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", Object)
+], DirectMessage.prototype, "replyToMessageId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "timestamptz", nullable: true }),
+    __metadata("design:type", Object)
+], DirectMessage.prototype, "pinnedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", Object)
+], DirectMessage.prototype, "pinnedById", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" }),
+    __metadata("design:type", Date)
+], DirectMessage.prototype, "chatUpdatedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", String)
+], DirectMessage.prototype, "clientMessageId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "bigint", generated: "increment" }),
+    __metadata("design:type", String)
+], DirectMessage.prototype, "chatSequence", void 0);
+__decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
     __metadata("design:type", String)
 ], DirectMessage.prototype, "id", void 0);
@@ -68,5 +96,6 @@ __decorate([
     __metadata("design:type", Date)
 ], DirectMessage.prototype, "updatedAt", void 0);
 exports.DirectMessage = DirectMessage = __decorate([
-    (0, typeorm_1.Entity)("direct_messages")
+    (0, typeorm_1.Entity)("direct_messages"),
+    (0, typeorm_1.Index)(["senderId", "recipientId", "clientMessageId"], { unique: true })
 ], DirectMessage);

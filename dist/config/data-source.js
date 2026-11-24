@@ -4,6 +4,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppDataSource = void 0;
+const ProjectAssets_1 = require("../entities/ProjectAssets");
+const _1794900000000_ProjectManagement_1 = require("../migrations/1794900000000-ProjectManagement");
+const Notification_1 = require("../entities/Notification");
+const _1794800000000_Notifications_1 = require("../migrations/1794800000000-Notifications");
 require("reflect-metadata");
 const typeorm_1 = require("typeorm");
 const User_1 = require("../entities/User");
@@ -31,6 +35,22 @@ const DirectMessage_1 = require("../entities/DirectMessage");
 const ProjectMember_1 = require("../entities/ProjectMember");
 const OrganizationPermission_1 = require("../entities/OrganizationPermission");
 const UserOrganization_1 = require("../entities/UserOrganization");
+const ContactSubmission_1 = require("../entities/ContactSubmission");
+const _1795000000000_ContactSubmissions_1 = require("../migrations/1795000000000-ContactSubmissions");
+// New entities
+const TeamRole_1 = require("../entities/TeamRole");
+const TeamMembership_1 = require("../entities/TeamMembership");
+const WorkflowStageMember_1 = require("../entities/WorkflowStageMember");
+const Meeting_1 = require("../entities/Meeting");
+const MeetingParticipant_1 = require("../entities/MeetingParticipant");
+const MeetingNote_1 = require("../entities/MeetingNote");
+const MinutesOfMeeting_1 = require("../entities/MinutesOfMeeting");
+const MomActionItem_1 = require("../entities/MomActionItem");
+const ProjectMessage_1 = require("../entities/ProjectMessage");
+const _1794700000000_ReliableChat_1 = require("../migrations/1794700000000-ReliableChat");
+const ChatAttachment_1 = require("../entities/ChatAttachment");
+const _1794700001000_ChatMedia_1 = require("../migrations/1794700001000-ChatMedia");
+const ChatEvent_1 = require("../entities/ChatEvent");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const nodeEnv = (process.env.NODE_ENV || "").trim().toLowerCase();
@@ -52,8 +72,8 @@ exports.AppDataSource = new typeorm_1.DataSource({
             database: databaseName
         }),
     synchronize: nodeEnv === "development",
-    logging: nodeEnv === "development",
-    entities: [
+    logging: false,
+    entities: [ProjectAssets_1.ProjectDocument, ProjectAssets_1.ProjectDocumentLink, ProjectAssets_1.OrganizationResource, ProjectAssets_1.ResourceAllocation, Notification_1.Notification,
         User_1.User,
         Team_1.Team,
         Project_1.Project,
@@ -76,10 +96,23 @@ exports.AppDataSource = new typeorm_1.DataSource({
         ChannelMessage_1.ChannelMessage,
         Friendship_1.Friendship,
         DirectMessage_1.DirectMessage,
+        ProjectMessage_1.ProjectMessage,
+        ChatAttachment_1.ChatAttachment,
+        ChatEvent_1.ChatEvent,
         ProjectMember_1.ProjectMember,
         OrganizationPermission_1.OrganizationPermission,
-        UserOrganization_1.UserOrganization
+        UserOrganization_1.UserOrganization,
+        ContactSubmission_1.ContactSubmission,
+        // New entities
+        TeamRole_1.TeamRole,
+        TeamMembership_1.TeamMembership,
+        WorkflowStageMember_1.WorkflowStageMember,
+        Meeting_1.Meeting,
+        MeetingParticipant_1.MeetingParticipant,
+        MeetingNote_1.MeetingNote,
+        MinutesOfMeeting_1.MinutesOfMeeting,
+        MomActionItem_1.MomActionItem,
     ],
-    migrations: [],
+    migrations: [_1794900000000_ProjectManagement_1.ProjectManagement1794900000000, _1794800000000_Notifications_1.Notifications1794800000000, _1794700000000_ReliableChat_1.ReliableChat1794700000000, _1794700001000_ChatMedia_1.ChatMedia1794700001000, _1795000000000_ContactSubmissions_1.ContactSubmissions1795000000000],
     subscribers: [],
 });

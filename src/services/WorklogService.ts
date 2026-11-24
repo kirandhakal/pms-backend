@@ -34,7 +34,7 @@ export class WorklogService {
         });
 
         let startedAt: Date | undefined = task.startDate;
-        let doneAt: Date | undefined = task.completedAt;
+        let doneAt: Date | undefined = task.completedAt || undefined;
 
         for (const activity of activities) {
             if (!startedAt && activity.type === TaskActivityType.STAGE_CHANGED) {

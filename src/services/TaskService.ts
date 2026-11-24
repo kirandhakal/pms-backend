@@ -1,3 +1,4 @@
+import { notifyUser } from "./NotificationService";
 import { AppDataSource } from "../config/data-source";
 import { Task, TaskStatus } from "../entities/Task";
 import { Project } from "../entities/Project";
@@ -34,6 +35,9 @@ export class TaskService {
         });
 
         const savedTask = await this.taskRepo.save(task);
+        if (data.assignedUserId && data.assignedUserId !== data.actorId) {
+            await notifyUser(data.assignedUserId, "task.assigned", "Task assigned to you", savedTask.name).catch(error => console.error("Notification delivery failed", error));
+        }
 
         if (data.teamId) {
             await this.activityLogService.log({
@@ -62,7 +66,7 @@ export class TaskService {
             task.completedAt = new Date();
             task.completionPercentage = 100;
         } else if (previousStatus === TaskStatus.DONE) {
-            task.completedAt = undefined;
+            task.completedAt = null;
         }
 
         if (status === TaskStatus.IN_PROGRESS && !task.startDate) {

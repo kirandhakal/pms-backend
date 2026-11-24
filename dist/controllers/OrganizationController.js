@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrganizationController = void 0;
 const OrganizationServiceClean_1 = require("../services/OrganizationServiceClean");
+const User_1 = require("../entities/User");
 const organizationService = new OrganizationServiceClean_1.OrganizationService();
 class OrganizationController {
     async create(req, res) {
@@ -29,6 +30,22 @@ class OrganizationController {
             res.status(500).json({ message: err.message });
         }
     }
+    async searchUsers(req, res) {
+        try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const teamId = String(req.params.teamId);
+            const q = String(req.query.q || "");
+            const result = await organizationService.searchUsersForOrg(actorId, teamId, q);
+            res.json({ data: result });
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
     async join(req, res) {
         try {
             const actorId = req.user?.id;
@@ -36,9 +53,44 @@ class OrganizationController {
                 res.status(401).json({ message: "Unauthorized" });
                 return;
             }
+            if (req.body?.token) {
+                const result = await organizationService.joinViaInviteToken(actorId, String(req.body.token));
+                res.json(result);
+                return;
+            }
             const { teamId } = req.body;
             const member = await organizationService.joinOrganization(actorId, teamId);
             res.json(member);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
+    async invitePreview(req, res) {
+        try {
+            const token = String(req.params.token || "");
+            const preview = await organizationService.getInvitePreview(token);
+            res.json({ data: preview });
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
+    async createInviteLink(req, res) {
+        try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const teamId = String(req.params.teamId);
+            const result = await organizationService.createInviteLink(actorId, teamId, {
+                role: req.body.role || User_1.UserRole.MEMBER,
+                permissions: req.body.permissions,
+                teamRoleId: req.body.teamRoleId,
+                expiresInHours: req.body.expiresInHours,
+            });
+            res.status(201).json(result);
         }
         catch (err) {
             res.status(400).json({ message: err.message });
@@ -52,9 +104,29 @@ class OrganizationController {
                 return;
             }
             const teamId = String(req.params.teamId);
-            const { email, role } = req.body;
-            const result = await organizationService.inviteMember(actorId, teamId, email, role);
+            const { email, role, permissions, teamRoleId } = req.body;
+            const result = await organizationService.inviteMember(actorId, teamId, email, role || User_1.UserRole.MEMBER, permissions || [], teamRoleId);
             res.json(result);
+        }
+        catch (err) {
+            res.status(400).json({ message: err.message });
+        }
+    }
+    async addExistingUser(req, res) {
+        try {
+            const actorId = req.user?.id;
+            if (!actorId) {
+                res.status(401).json({ message: "Unauthorized" });
+                return;
+            }
+            const teamId = String(req.params.teamId);
+            const { userId, role, permissions, teamRoleId } = req.body;
+            if (!userId) {
+                res.status(400).json({ message: "userId is required" });
+                return;
+            }
+            const member = await organizationService.addExistingUser(actorId, teamId, userId, role || User_1.UserRole.MEMBER, permissions || [], teamRoleId);
+            res.status(201).json(member);
         }
         catch (err) {
             res.status(400).json({ message: err.message });
@@ -155,7 +227,9 @@ class OrganizationController {
             }
             const teamId = String(req.params.teamId);
             const memberId = String(req.params.memberId);
-            const permissionValues = Array.isArray(req.body?.permissions) ? req.body.permissions : [];
+            const permissionValues = Array.isArray(req.body?.permissions)
+                ? req.body.permissions
+                : [];
             const result = await organizationService.setMemberPermissions(actorId, teamId, memberId, permissionValues);
             res.json(result);
         }

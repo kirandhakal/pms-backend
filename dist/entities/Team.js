@@ -13,6 +13,7 @@ exports.Team = void 0;
 const typeorm_1 = require("typeorm");
 const User_1 = require("./User");
 const Project_1 = require("./Project");
+const TeamMembership_1 = require("./TeamMembership");
 let Team = class Team {
 };
 exports.Team = Team;
@@ -36,6 +37,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => Project_1.Project, (project) => project.team),
     __metadata("design:type", Array)
 ], Team.prototype, "projects", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => TeamMembership_1.TeamMembership, (m) => m.team),
+    __metadata("design:type", Array)
+], Team.prototype, "memberships", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

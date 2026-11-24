@@ -1,10 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TaskService = void 0;
+const NotificationService_1 = require("./NotificationService");
 const data_source_1 = require("../config/data-source");
 const Task_1 = require("../entities/Task");
 const ActivityLog_1 = require("../entities/ActivityLog");
 const ActivityLogService_1 = require("./ActivityLogService");
+const WorklogService_1 = require("./WorklogService");
 class TaskService {
     constructor() {
         this.taskRepo = data_source_1.AppDataSource.getRepository(Task_1.Task);
@@ -22,6 +24,9 @@ class TaskService {
             owner: data.ownerId ? { id: data.ownerId } : undefined
         });
         const savedTask = await this.taskRepo.save(task);
+        if (data.assignedUserId && data.assignedUserId !== data.actorId) {
+            await (0, NotificationService_1.notifyUser)(data.assignedUserId, "task.assigned", "Task assigned to you", savedTask.name).catch(error => console.error("Notification delivery failed", error));
+        }
         if (data.teamId) {
             await this.activityLogService.log({
                 action: ActivityLog_1.ActivityAction.TASK_CREATED,
@@ -40,6 +45,7 @@ class TaskService {
         });
         if (!task)
             throw new Error("Task not found");
+        const previousStatus = task.status;
         task.status = status;
         if (completion !== undefined)
             task.completionPercentage = completion;
@@ -47,7 +53,22 @@ class TaskService {
             task.completedAt = new Date();
             task.completionPercentage = 100;
         }
+        else if (previousStatus === Task_1.TaskStatus.DONE) {
+            task.completedAt = null;
+        }
+        if (status === Task_1.TaskStatus.IN_PROGRESS && !task.startDate) {
+            task.startDate = new Date();
+        }
         const savedTask = await this.taskRepo.save(task);
+        // Auto-worklog when status transitions to Done
+        if (status === Task_1.TaskStatus.DONE && previousStatus !== Task_1.TaskStatus.DONE) {
+            try {
+                await WorklogService_1.worklogService.createFromTaskCompletion(savedTask, actorId || savedTask.assigneeId);
+            }
+            catch (err) {
+                console.warn("Auto worklog creation skipped:", err.message);
+            }
+        }
         if (savedTask.team?.id) {
             await this.activityLogService.log({
                 action: ActivityLog_1.ActivityAction.TASK_STATUS_UPDATED,

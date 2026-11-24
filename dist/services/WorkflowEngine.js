@@ -4,6 +4,7 @@ exports.workflowEngine = exports.WorkflowEngine = exports.DEFAULT_WORKFLOW_STAGE
 const data_source_1 = require("../config/data-source");
 const Workflow_1 = require("../entities/Workflow");
 const WorkflowStage_1 = require("../entities/WorkflowStage");
+const WorkflowStageMember_1 = require("../entities/WorkflowStageMember");
 const Task_1 = require("../entities/Task");
 const TaskActivity_1 = require("../entities/TaskActivity");
 const errorHandler_1 = require("../middlewares/errorHandler");
@@ -32,6 +33,7 @@ class WorkflowEngine {
     constructor() {
         this.workflowRepo = data_source_1.AppDataSource.getRepository(Workflow_1.Workflow);
         this.stageRepo = data_source_1.AppDataSource.getRepository(WorkflowStage_1.WorkflowStage);
+        this.stageMemberRepo = data_source_1.AppDataSource.getRepository(WorkflowStageMember_1.WorkflowStageMember);
         this.taskRepo = data_source_1.AppDataSource.getRepository(Task_1.Task);
         this.activityRepo = data_source_1.AppDataSource.getRepository(TaskActivity_1.TaskActivity);
     }
@@ -120,7 +122,7 @@ class WorkflowEngine {
     async getWorkflowById(workflowId) {
         return this.workflowRepo.findOne({
             where: { id: workflowId },
-            relations: ["stages"],
+            relations: ["stages", "stages.stageMembers"],
             order: { stages: { order: "ASC" } }
         });
     }
@@ -245,7 +247,7 @@ class WorkflowEngine {
             throw new errorHandler_1.ApiError("Task not found", 404);
         }
         const toStage = await this.stageRepo.findOne({ where: { id: toStageId } });
-        if (!toStage) {
+        if (!toStage || !toStage.isActive || toStage.workflowId !== task.workflowId) {
             throw new errorHandler_1.ApiError("Target stage not found", 404);
         }
         // Validate transition
@@ -268,11 +270,13 @@ class WorkflowEngine {
         }
         else if (toStage.isDefault) {
             task.status = Task_1.TaskStatus.TODO;
-            task.completedAt = undefined;
+            task.completedAt = null;
+            task.completionPercentage = 0;
         }
         else {
             task.status = Task_1.TaskStatus.IN_PROGRESS;
-            task.completedAt = undefined;
+            task.completedAt = null;
+            task.completionPercentage = 0;
         }
         const savedTask = await this.taskRepo.save(task);
         // Execute onEnter hook for new stage
@@ -390,6 +394,98 @@ class WorkflowEngine {
             };
         }));
         return stats;
+    }
+    // ─────────────────────────────────────────────────
+    // STAGE VISIBILITY & MEMBER MANAGEMENT
+    // ─────────────────────────────────────────────────
+    /**
+     * Update stage visibility (TEAM_ONLY | PROJECT_WIDE)
+     */
+    async updateStageVisibility(stageId, visibility) {
+        const stage = await this.stageRepo.findOne({ where: { id: stageId } });
+        if (!stage)
+            throw new errorHandler_1.ApiError("Stage not found", 404);
+        stage.visibility = visibility;
+        return this.stageRepo.save(stage);
+    }
+    /**
+     * Add member(s) to a stage (for TEAM_ONLY visibility)
+     */
+    async addStageMembers(stageId, userIds) {
+        const stage = await this.stageRepo.findOne({ where: { id: stageId } });
+        if (!stage)
+            throw new errorHandler_1.ApiError("Stage not found", 404);
+        const existing = await this.stageMemberRepo.find({ where: { stageId } });
+        const existingSet = new Set(existing.map((m) => m.userId));
+        const newMembers = userIds
+            .filter((id) => !existingSet.has(id))
+            .map((userId) => this.stageMemberRepo.create({ stageId, userId }));
+        if (newMembers.length === 0)
+            return existing;
+        const saved = await this.stageMemberRepo.save(newMembers);
+        return [...existing, ...saved];
+    }
+    /**
+     * Remove a member from a stage
+     */
+    async removeStageMember(stageId, userId) {
+        const member = await this.stageMemberRepo.findOne({
+            where: { stageId, userId },
+        });
+        if (!member)
+            throw new errorHandler_1.ApiError("Stage member not found", 404);
+        await this.stageMemberRepo.remove(member);
+    }
+    /**
+     * List members of a stage
+     */
+    async getStageMembers(stageId) {
+        return this.stageMemberRepo.find({
+            where: { stageId },
+            relations: ["user"],
+        });
+    }
+    /**
+     * Check if a user can view a stage based on visibility rules.
+     * canViewStageForUser(userId, stage) =
+     *   user.roleLevel IN (TEAM_LEAD, PROJECT_MANAGER, ORG_CREATOR)
+     *   OR stage.visibility == PROJECT_WIDE
+     *   OR user.id IN stage.members
+     */
+    async canUserViewStage(userId, stageId, isElevatedRole) {
+        if (isElevatedRole)
+            return true;
+        const stage = await this.stageRepo.findOne({ where: { id: stageId } });
+        if (!stage)
+            return false;
+        if (stage.visibility === WorkflowStage_1.StageVisibility.PROJECT_WIDE)
+            return true;
+        // TEAM_ONLY — check membership
+        const member = await this.stageMemberRepo.findOne({
+            where: { stageId, userId },
+        });
+        return !!member;
+    }
+    /**
+     * Filter stages of a workflow based on user visibility.
+     * Returns only visually accessible stages for the user.
+     */
+    async getVisibleStagesForUser(workflowId, userId, isElevatedRole) {
+        const workflow = await this.workflowRepo.findOne({
+            where: { id: workflowId },
+            relations: ["stages", "stages.stageMembers"],
+            order: { stages: { order: "ASC" } },
+        });
+        if (!workflow)
+            throw new errorHandler_1.ApiError("Workflow not found", 404);
+        if (isElevatedRole)
+            return workflow.stages;
+        return workflow.stages.filter((stage) => {
+            if (stage.visibility === WorkflowStage_1.StageVisibility.PROJECT_WIDE)
+                return true;
+            // TEAM_ONLY — check if user is in stage members
+            return stage.stageMembers?.some((m) => m.userId === userId);
+        });
     }
 }
 exports.WorkflowEngine = WorkflowEngine;

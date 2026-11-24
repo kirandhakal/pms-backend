@@ -17,6 +17,34 @@ let TaskComment = class TaskComment {
 };
 exports.TaskComment = TaskComment;
 __decorate([
+    (0, typeorm_1.Column)({ type: "bigint", default: "0" }),
+    __metadata("design:type", String)
+], TaskComment.prototype, "chatVersion", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", Object)
+], TaskComment.prototype, "replyToMessageId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "timestamptz", nullable: true }),
+    __metadata("design:type", Object)
+], TaskComment.prototype, "pinnedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", Object)
+], TaskComment.prototype, "pinnedById", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" }),
+    __metadata("design:type", Date)
+], TaskComment.prototype, "chatUpdatedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", String)
+], TaskComment.prototype, "clientMessageId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "bigint", generated: "increment" }),
+    __metadata("design:type", String)
+], TaskComment.prototype, "chatSequence", void 0);
+__decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
     __metadata("design:type", String)
 ], TaskComment.prototype, "id", void 0);
@@ -69,5 +97,6 @@ __decorate([
 ], TaskComment.prototype, "updatedAt", void 0);
 exports.TaskComment = TaskComment = __decorate([
     (0, typeorm_1.Entity)("task_comments"),
-    (0, typeorm_1.Index)(["taskId", "createdAt"])
+    (0, typeorm_1.Index)(["taskId", "createdAt"]),
+    (0, typeorm_1.Index)(["taskId", "userId", "clientMessageId"], { unique: true })
 ], TaskComment);

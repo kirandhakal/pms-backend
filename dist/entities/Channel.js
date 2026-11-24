@@ -24,6 +24,10 @@ let Channel = class Channel {
 };
 exports.Channel = Channel;
 __decorate([
+    (0, typeorm_1.Column)({ type: "jsonb", nullable: true }),
+    __metadata("design:type", Object)
+], Channel.prototype, "allowedFileTypes", void 0);
+__decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
     __metadata("design:type", String)
 ], Channel.prototype, "id", void 0);
